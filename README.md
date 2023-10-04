@@ -1,9 +1,14 @@
 # M-USE_Analysis
 Matlab scripts to import and analyze M-USE data.
 
-Import_MUSE_Session_RawData will read and convert all raw data files produced by an M-USE session into .mat files. The raw data is organized as in this figure: 
+Import_MUSE_Session_RawData will read and convert all raw data files produced by an M-USE session into .mat files.
 
-<img width="308" alt="image" src="https://github.com/Multitask-Unified-Suite-for-Expts/M-USE_Analysis/assets/39202706/1761fa4b-d8d3-4470-8f94-922fd863e4ff">
+Raw data is organized in the following hierarchy:
+<img width="308" alt="image" src="https://github.com/Multitask-Unified-Suite-for-Expts/M-USE_Analysis/assets/39202706/bfb073c4-8928-44ce-9d8c-e14649df3513">
+
+After conversion, the contents of each data folder within each task's folder are converted to single .mat files, as well as within each SessionLevel.TaskSelection state.
+
+
 
 
 
