@@ -1,4 +1,4 @@
-function parsedData = ParseSyncBoxData(rawData)
+function parsedData = ParseSyncBoxData(syncBoxSerialRecvData)
 
 commandStrings = {'HLP', 'ECH', 'IDQ', 'INI', 'LOG', 'LIN', 'LVB', 'TPW', 'TPP', 'TIM', 'RWD', ...
     'NSU', 'NHD', 'NPD', 'NEU', 'NDW', 'CSL', 'CSR', 'CSI', 'CAO', 'CAF', 'CTR', 'CTL', 'FIL', 'FST', 'FSW', 'XAL', 'XJL'};
@@ -14,12 +14,14 @@ structData.Commands = struct ('Frame', {}, 'FrameStart', {}, 'Message', {});
 structData.SystemStatus = struct ('Frame', {}, 'FrameStart', {}, 'Message', {});
 structData.Unknown = struct ('Frame', {}, 'FrameStart', {}, 'Message', {});
 
+parsedData = syncBoxSerialRecvData;
+
 toMatch = [];
 reverseStr = '';
-for i = 1:size(rawData,1)
+for i = 1:height(syncBoxSerialRecvData.Raw)
     
     %print percentage of file parse
-    percentDone = 100 * i / size(rawData,1);
+    percentDone = 100 * i / height(syncBoxSerialRecvData.Raw);
     msg = sprintf('......Percent done: %3.1f', percentDone); %Don't forget this semicolon
     fprintf([reverseStr, msg]);
     reverseStr = repmat(sprintf('\b'), 1, length(msg));
@@ -27,10 +29,10 @@ for i = 1:size(rawData,1)
     %if the previous line was incomplete, this line should be appended to
     %it
     if ~isempty(toMatch)
-        toMatch.Message = {[toMatch.Message{:} rawData.Message{i}]};
+        toMatch.Message = {[toMatch.Message{:} syncBoxSerialRecvData.Raw.Message{i}]};
         thisLine = toMatch;
     else
-        thisLine = rawData(i,:);
+        thisLine = syncBoxSerialRecvData.Raw(i,:);
     end
     
     %compare the first three characters of the string to neurarduino 
@@ -56,7 +58,6 @@ for i = 1:length(structFields)
         parsedData.(structFields{i}) = NaN;
     end
 end
- fred = 2;
 
 
 % structData.JoyAndPhotoDetails = struct('Subject', {}, 'Frame', {}, 'FrameStart', {}, 'ArduinoTimestamp', {}, ...
