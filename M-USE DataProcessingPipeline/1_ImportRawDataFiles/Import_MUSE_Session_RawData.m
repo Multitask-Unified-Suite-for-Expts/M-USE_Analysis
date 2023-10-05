@@ -29,6 +29,7 @@ function Import_MUSE_Session_RawData(varargin)
     ignoreBlockCondition = 1;
     ignoreReplayer = 1;
     forceLP = 0;
+    syncboxSerialData = 1;
 
     deleteAbortedTrials = 0;
     nanAbortedTrials = 1;
@@ -261,14 +262,14 @@ end
 %% Process Serial Data
 function serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum)
     % Load sent and received serial data if available.
-    serialData.SerialSentData = LoadDataCheckCompleteFile('serialSentData', currentProcessedDataPath, forceProcessAllData);
-    serialData.SerialRecvData = LoadDataCheckCompleteFile('serialRecvData', currentProcessedDataPath, forceProcessAllData);
+    serialData.SerialSentData.Raw = LoadDataCheckCompleteFile('serialSentData', currentProcessedDataPath, forceProcessAllData);
+    serialData.SerialRecvData.Raw = LoadDataCheckCompleteFile('serialRecvData', currentProcessedDataPath, forceProcessAllData);
    
     % If sent serial data is not loaded or has only one column, read it from raw data files.
     if isempty(serialData.SerialSentData) || width(serialData.SerialSentData) == 1
         % Read sent serial data from raw data files.
-        serialData.SerialSentData = ReadDataFiles([runtimeDataPath filesep 'SerialSentData'], '*SerialSentData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
-        serialData.SerialSentData = AddSubjectAndSession(serialData.SerialSentData, subjectNum, sessionNum);
+        serialData.SerialSentData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialSentData'], '*SerialSentData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialData.SerialSentData.Raw = AddSubjectAndSession(serialData.SerialSentData.Raw, subjectNum, sessionNum);
         
         % Save the processed sent serial data to the current processed data path.
         SaveDataCheckCompleteFile('serialSentData', serialData.SerialSentData, currentProcessedDataPath);
@@ -277,8 +278,11 @@ function serialData = processSerialData(runtimeDataPath, forceProcessAllData, cu
     % If received serial data is not loaded or has only one column, read it from raw data files.
     if isempty(serialData.SerialRecvData) || width(serialData.SerialRecvData) == 1
         % Read received serial data from raw data files.
-        serialData.SerialRecvData = ReadDataFiles([runtimeDataPath filesep 'SerialRecvData'], '*SerialRecvData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
-        serialData.SerialRecvData = AddSubjectAndSession(serialData.SerialRecvData, subjectNum, sessionNum);
+        serialData.SerialRecvData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialRecvData'], '*SerialRecvData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialData.SerialRecvData.Raw = AddSubjectAndSession(serialData.SerialRecvData.Raw, subjectNum, sessionNum);
+        serialData.SerialRecvData = ParseSyncboxData(serialData.SerialRecvData);
+
+        
         
         % Save the processed received serial data to the current processed data path.
         SaveDataCheckCompleteFile('serialRecvData', serialData.SerialRecvData, currentProcessedDataPath);
