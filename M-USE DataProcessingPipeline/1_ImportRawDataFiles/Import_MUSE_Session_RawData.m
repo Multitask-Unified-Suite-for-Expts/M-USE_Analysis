@@ -37,6 +37,7 @@ function Import_MUSE_Session_RawData(varargin)
     % Find task names in the specified data folder
     taskNames = findTaskNames(dataFolder);
     taskSelectionNames = cellfun(@(x) x(1:8), taskNames, 'UniformOutput', false);
+    taskSelectionNames = cellfun(@(name) ['TaskSelectionData/' name], taskSelectionNames, 'UniformOutput', false);
 
     % Define subject information
     subjectID = CheckVararginPairs('SubjectID', 'Subject1', varargin{:});
@@ -52,7 +53,8 @@ function Import_MUSE_Session_RawData(varargin)
     % Define runtime and processed data paths for each task
     [runTimeDataPaths, processedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskNames);
     [taskSelectionRunTimeDataPaths, taskSelectionProcessedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskSelectionNames);
-    
+    % Add "TaskSelection/" to each element using cellfun
+
     % Begin processing the data for each of the task folders
     for i = 1:numel(taskNames)
         currentTaskName = taskNames{i};
@@ -263,21 +265,19 @@ function frameData = processFrameData(runtimeDataPath, forceProcessAllData, curr
     % Attempt to load frame data from a processed data file.
     frameData = LoadDataCheckCompleteFile('frameData', currentProcessedDataPath, forceProcessAllData);
 
-    % If frame data is not loaded or has only one column, read it from raw data files.
-
+   
     if exist([runtimeDataPath filesep 'FrameData'], 'dir')
+        % Enter FrameData folder when parsing task FrameData
         path = [runtimeDataPath filesep 'FrameData'];
     else
-        path = 'FrameData';
+        % Use only runtimeDataPath when parsing TaskSelectionData (there is only one FrameData file)
+        path = runtimeDataPath;
     end
-
+    
+    % If frame data is not loaded or has only one column, read it from raw data files.
     if isempty(frameData) || width(frameData) == 1
         % Read frame data from raw data files.
-<<<<<<< Updated upstream
-        frameData = ReadDataFiles(path, '*FrameData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
-=======
-        frameData = ReadDataFiles([runtimeDataPath filesep 'FrameData'], '*FrameData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
->>>>>>> Stashed changes
+        frameData = ReadDataFiles(path, '*FrameData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         frameData = AddSubjectAndSession(frameData, subjectNum, sessionNum);
 
         % Save the processed frame data to the current processed data path.
@@ -293,10 +293,18 @@ function gazeData = processGazeData(runtimeDataPath, forceProcessAllData, curren
     % Attempt to load gaze data from a processed data file.
     gazeData = LoadDataCheckCompleteFile('gazeData', currentProcessedDataPath, forceProcessAllData);
 
+    if exist([runtimeDataPath filesep 'GazeData'], 'dir')
+        % Enter GazeData folder when parsing Task GazeData
+        path = [runtimeDataPath filesep 'GazeData'];
+    else
+        % Use only runtimeDataPath when parsing TaskSelectionData (there is only one GazeData file)
+        path = runtimeDataPath;
+    end
+
     % If gaze data is not loaded or has only one column, read it from raw data files.
     if isempty(gazeData) || width(gazeData) == 1
         % Read gaze data from raw data files.
-        gazeData = ReadDataFiles([runtimeDataPath filesep 'GazeData'], '*GazeData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        gazeData = ReadDataFiles(path, '*GazeData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         gazeData = AddSubjectAndSession(gazeData, subjectNum, sessionNum);
 
         % Save the processed gaze data to the current processed data path.
@@ -310,10 +318,26 @@ function serialData = processSerialData(runtimeDataPath, forceProcessAllData, cu
     serialData.SerialSentData.Raw = LoadDataCheckCompleteFile('serialSentData', currentProcessedDataPath, forceProcessAllData);
     serialData.SerialRecvData.Raw = LoadDataCheckCompleteFile('serialRecvData', currentProcessedDataPath, forceProcessAllData);
    
+    if exist([runtimeDataPath filesep 'SerialSentData'], 'dir')
+        % Enter SerialSentData folder when parsing Task SerialSentData
+        sentPath = [runtimeDataPath filesep 'SerialSentData'];
+    else
+        % Use only runtimeDataPath when parsing TaskSelectionData (there is only one SerialSentData file)
+        sentPath = runtimeDataPath;
+    end
+    
+    if exist([runtimeDataPath filesep 'SerialRecvData'], 'dir')
+        % Enter SerialSentData folder when parsing Task SerialSentData
+        recvPath = [runtimeDataPath filesep 'SerialRecvData'];
+    else
+        % Use only runtimeDataPath when parsing TaskSelectionData (there is only one SerialSentData file)
+        recvPath = runtimeDataPath;
+    end
+    
     % If sent serial data is not loaded or has only one column, read it from raw data files.
     if isempty(serialData.SerialSentData) || width(serialData.SerialSentData) == 1
         % Read sent serial data from raw data files.
-        serialData.SerialSentData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialSentData'], '*SerialSentData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialData.SerialSentData.Raw = ReadDataFiles(sentPath, '*SerialSentData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         serialData.SerialSentData.Raw = AddSubjectAndSession(serialData.SerialSentData.Raw, subjectNum, sessionNum);
         
         % Save the processed sent serial data to the current processed data path.
@@ -323,7 +347,7 @@ function serialData = processSerialData(runtimeDataPath, forceProcessAllData, cu
     % If received serial data is not loaded or has only one column, read it from raw data files.
     if isempty(serialData.SerialRecvData) || width(serialData.SerialRecvData) == 1
         % Read received serial data from raw data files.
-        serialData.SerialRecvData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialRecvData'], '*SerialRecvData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialData.SerialRecvData.Raw = ReadDataFiles(recvPath, '*SerialRecvData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         serialData.SerialRecvData.Raw = AddSubjectAndSession(serialData.SerialRecvData.Raw, subjectNum, sessionNum);
         serialData.SerialRecvData = ParseSyncboxData(serialData.SerialRecvData);
 
