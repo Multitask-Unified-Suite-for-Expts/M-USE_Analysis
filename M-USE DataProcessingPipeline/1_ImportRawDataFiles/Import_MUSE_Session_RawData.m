@@ -230,9 +230,16 @@ function frameData = processFrameData(runtimeDataPath, forceProcessAllData, curr
     frameData = LoadDataCheckCompleteFile('frameData', currentProcessedDataPath, forceProcessAllData);
 
     % If frame data is not loaded or has only one column, read it from raw data files.
+
+    if exist([runtimeDataPath filesep 'FrameData'], 'dir')
+        path = [runtimeDataPath filesep 'FrameData'];
+    else
+        path = 'FrameData';
+    end
+
     if isempty(frameData) || width(frameData) == 1
         % Read frame data from raw data files.
-        frameData = ReadDataFiles([runtimeDataPath filesep 'FrameData'], '*FrameData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        frameData = ReadDataFiles(path, '*FrameData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         frameData = AddSubjectAndSession(frameData, subjectNum, sessionNum);
 
         % Save the processed frame data to the current processed data path.
