@@ -33,10 +33,10 @@ function Import_MUSE_Session_RawData(varargin)
 
     deleteAbortedTrials = 0;
     nanAbortedTrials = 1;
-    global currentProcessedDataPath; 
 
     % Find task names in the specified data folder
     taskNames = findTaskNames(dataFolder);
+    taskSelectionNames = cellfun(@(x) x(1:8), taskNames, 'UniformOutput', false);
 
     % Define subject information
     subjectID = CheckVararginPairs('SubjectID', 'Subject1', varargin{:});
@@ -51,16 +51,29 @@ function Import_MUSE_Session_RawData(varargin)
 
     % Define runtime and processed data paths for each task
     [runTimeDataPaths, processedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskNames);
-
+    [taskSelectionRunTimeDataPaths, taskSelectionProcessedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskSelectionNames);
+    
     % Begin processing the data for each of the task folders
     for i = 1:numel(taskNames)
         currentTaskName = taskNames{i};
-        currentDataPath = runTimeDataPaths{i};
+        currentTaskDataPath = runTimeDataPaths{i};
         currentProcessedDataPath = processedDataPaths{i};
-        processAllDataTypes(currentDataPath, currentTaskName, forceProcessAllData,  currentProcessedDataPath, ...
+        
+        processAllDataTypes(currentTaskDataPath, currentTaskName, forceProcessAllData,  currentProcessedDataPath, ...
+            subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, ...
+            gazeArgs, ignoreBlockCondition);
+        
+        currentTaskSelectionFolderName = taskSelectionNames{i};
+        currentTaskSelectionDataPath = taskSelectionRunTimeDataPaths{i};
+        currentTaskSelectionProcessedDataPath = taskSelectionProcessedDataPaths{i};
+
+         processTaskSelectionDataTypes(currentTaskSelectionDataPath, currentTaskName, forceProcessAllData,  currentTaskSelectionProcessedDataPath, ...
             subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, ...
             gazeArgs, ignoreBlockCondition);
     end
+
+    % Begin processing the data for each of the folders in task selection
+    
 end
 
 function [runtimeDataPaths, processedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskNames)
@@ -127,6 +140,27 @@ function processAllDataTypes(runtimeDataPath, currentTaskName, forceProcessAllDa
     % Load or process serial data
     serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
 end
+
+function processTaskSelectionDataTypes(runtimeDataPath, currentTaskSelecitonName, forceProcessAllData, currentProcessedDataPath, ...
+    subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, gazeArgs, ...
+    ignoreBlockCondition)
+
+    fprintf(['\n\nProcessing data for task ' currentTaskSelectionName '.\n']);
+
+  % Load or process frame data
+    frameData = processFrameData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+
+    % Load or process gaze data if gazeArgs is not 'cancel'
+    if ~strcmp(gazeArgs, 'cancel')
+        gazeData = processGazeData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+    else
+        gazeData = [];
+    end
+    
+    % Load or process serial data
+    serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+end
+
 
 %% Process Trial Data
 function trialData = processTrialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, deleteAbortedTrials, nanAbortedTrials, subjectNum, sessionNum)
@@ -280,8 +314,8 @@ function serialData = processSerialData(runtimeDataPath, forceProcessAllData, cu
         % Read received serial data from raw data files.
         serialData.SerialRecvData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialRecvData'], '*SerialRecvData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         serialData.SerialRecvData.Raw = AddSubjectAndSession(serialData.SerialRecvData.Raw, subjectNum, sessionNum);
-        serialData.SerialRecvData = ParseSyncBoxData(serialData.SerialRecvData);
-        
+        serialData.SerialRecvData = ParseSyncboxData(serialData.SerialRecvData);
+
         
         
         % Save the processed received serial data to the current processed data path.

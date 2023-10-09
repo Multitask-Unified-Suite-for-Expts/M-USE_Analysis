@@ -33,10 +33,10 @@ function Import_MUSE_Session_RawData(varargin)
 
     deleteAbortedTrials = 0;
     nanAbortedTrials = 1;
-    global currentProcessedDataPath; 
 
     % Find task names in the specified data folder
     taskNames = findTaskNames(dataFolder);
+    taskSelectionNames = cellfun(@(x) x(1:8), taskNames, 'UniformOutput', false);
 
     % Define subject information
     subjectID = CheckVararginPairs('SubjectID', 'Subject1', varargin{:});
@@ -51,16 +51,29 @@ function Import_MUSE_Session_RawData(varargin)
 
     % Define runtime and processed data paths for each task
     [runTimeDataPaths, processedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskNames);
-
+    [taskSelectionRunTimeDataPaths, taskSelectionProcessedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskSelectionNames);
+    
     % Begin processing the data for each of the task folders
     for i = 1:numel(taskNames)
         currentTaskName = taskNames{i};
-        currentDataPath = runTimeDataPaths{i};
+        currentTaskDataPath = runTimeDataPaths{i};
         currentProcessedDataPath = processedDataPaths{i};
-        processAllDataTypes(currentDataPath, currentTaskName, forceProcessAllData,  currentProcessedDataPath, ...
+        
+        processAllDataTypes(currentTaskDataPath, currentTaskName, forceProcessAllData,  currentProcessedDataPath, ...
+            subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, ...
+            gazeArgs, ignoreBlockCondition);
+        
+        currentTaskSelectionFolderName = taskSelectionNames{i};
+        currentTaskSelectionDataPath = taskSelectionRunTimeDataPaths{i};
+        currentTaskSelectionProcessedDataPath = taskSelectionProcessedDataPaths{i};
+
+         processTaskSelectionDataTypes(currentTaskSelectionDataPath, currentTaskSelectionFolderName, forceProcessAllData,  currentTaskSelectionProcessedDataPath, ...
             subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, ...
             gazeArgs, ignoreBlockCondition);
     end
+
+    % Begin processing the data for each of the folders in task selection
+    
 end
 
 function [runtimeDataPaths, processedDataPaths] = defineDataStoragePaths(subjectID, dataFolder, taskNames)
@@ -127,6 +140,27 @@ function processAllDataTypes(runtimeDataPath, currentTaskName, forceProcessAllDa
     % Load or process serial data
     serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
 end
+
+function processTaskSelectionDataTypes(runtimeDataPath, currentTaskSelectionFolderName, forceProcessAllData, currentProcessedDataPath, ...
+    subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, gazeArgs, ...
+    ignoreBlockCondition)
+
+    fprintf(['\n\nProcessing data for task ' currentTaskSelectionFolderName '.\n']);
+
+  % Load or process frame data
+    frameData = processFrameData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+
+    % Load or process gaze data if gazeArgs is not 'cancel'
+    if ~strcmp(gazeArgs, 'cancel')
+        gazeData = processGazeData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+    else
+        gazeData = [];
+    end
+    
+    % Load or process serial data
+    serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+end
+
 
 %% Process Trial Data
 function trialData = processTrialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, deleteAbortedTrials, nanAbortedTrials, subjectNum, sessionNum)
@@ -239,7 +273,11 @@ function frameData = processFrameData(runtimeDataPath, forceProcessAllData, curr
 
     if isempty(frameData) || width(frameData) == 1
         % Read frame data from raw data files.
+<<<<<<< Updated upstream
         frameData = ReadDataFiles(path, '*FrameData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+=======
+        frameData = ReadDataFiles([runtimeDataPath filesep 'FrameData'], '*FrameData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+>>>>>>> Stashed changes
         frameData = AddSubjectAndSession(frameData, subjectNum, sessionNum);
 
         % Save the processed frame data to the current processed data path.
@@ -258,7 +296,7 @@ function gazeData = processGazeData(runtimeDataPath, forceProcessAllData, curren
     % If gaze data is not loaded or has only one column, read it from raw data files.
     if isempty(gazeData) || width(gazeData) == 1
         % Read gaze data from raw data files.
-        gazeData = ReadDataFiles([runtimeDataPath filesep 'GazeData'], '*GazeData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        gazeData = ReadDataFiles([runtimeDataPath filesep 'GazeData'], '*GazeData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         gazeData = AddSubjectAndSession(gazeData, subjectNum, sessionNum);
 
         % Save the processed gaze data to the current processed data path.
@@ -275,7 +313,7 @@ function serialData = processSerialData(runtimeDataPath, forceProcessAllData, cu
     % If sent serial data is not loaded or has only one column, read it from raw data files.
     if isempty(serialData.SerialSentData) || width(serialData.SerialSentData) == 1
         % Read sent serial data from raw data files.
-        serialData.SerialSentData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialSentData'], '*SerialSentData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialData.SerialSentData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialSentData'], '*SerialSentData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         serialData.SerialSentData.Raw = AddSubjectAndSession(serialData.SerialSentData.Raw, subjectNum, sessionNum);
         
         % Save the processed sent serial data to the current processed data path.
@@ -285,7 +323,7 @@ function serialData = processSerialData(runtimeDataPath, forceProcessAllData, cu
     % If received serial data is not loaded or has only one column, read it from raw data files.
     if isempty(serialData.SerialRecvData) || width(serialData.SerialRecvData) == 1
         % Read received serial data from raw data files.
-        serialData.SerialRecvData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialRecvData'], '*SerialRecvData_Trial*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialData.SerialRecvData.Raw = ReadDataFiles([runtimeDataPath filesep 'SerialRecvData'], '*SerialRecvData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
         serialData.SerialRecvData.Raw = AddSubjectAndSession(serialData.SerialRecvData.Raw, subjectNum, sessionNum);
         serialData.SerialRecvData = ParseSyncboxData(serialData.SerialRecvData);
 
