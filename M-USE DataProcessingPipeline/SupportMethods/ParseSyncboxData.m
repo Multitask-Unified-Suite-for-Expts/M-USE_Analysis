@@ -1,4 +1,4 @@
-function parsedData = ParseSyncBoxData(syncBoxSerialRecvData)
+function parsedData = ParseSyncboxData(syncBoxSerialRecvData)
 
 commandStrings = {'HLP', 'ECH', 'IDQ', 'INI', 'LOG', 'LIN', 'LVB', 'TPW', 'TPP', 'TIM', 'RWD', ...
     'NSU', 'NHD', 'NPD', 'NEU', 'NDW', 'CSL', 'CSR', 'CSI', 'CAO', 'CAF', 'CTR', 'CTL', 'FIL', 'FST', 'FSW', 'XAL', 'XJL'};
