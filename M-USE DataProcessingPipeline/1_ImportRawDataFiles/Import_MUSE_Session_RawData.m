@@ -140,7 +140,7 @@ function processAllDataTypes(runtimeDataPath, currentTaskName, forceProcessAllDa
     end
     
     % Load or process serial data
-    serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+    processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
 end
 
 function processTaskSelectionDataTypes(runtimeDataPath, currentTaskSelectionFolderName, forceProcessAllData, currentProcessedDataPath, ...
@@ -160,7 +160,7 @@ function processTaskSelectionDataTypes(runtimeDataPath, currentTaskSelectionFold
     end
     
     % Load or process serial data
-    serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+    [serialSentData, serialRecvData] = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
 end
 
 
@@ -313,10 +313,10 @@ function gazeData = processGazeData(runtimeDataPath, forceProcessAllData, curren
 end
 
 %% Process Serial Data
-function serialData = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum)
+function [serialSentData, serialRecvData] = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum)
     % Load sent and received serial data if available.
-    serialData.SerialSentData.Raw = LoadDataCheckCompleteFile('serialSentData', currentProcessedDataPath, forceProcessAllData);
-    serialData.SerialRecvData.Raw = LoadDataCheckCompleteFile('serialRecvData', currentProcessedDataPath, forceProcessAllData);
+    serialSentData.Raw = LoadDataCheckCompleteFile('serialSentData', currentProcessedDataPath, forceProcessAllData);
+    serialRecvData.Raw = LoadDataCheckCompleteFile('serialRecvData', currentProcessedDataPath, forceProcessAllData);
    
     if exist([runtimeDataPath filesep 'SerialSentData'], 'dir')
         % Enter SerialSentData folder when parsing Task SerialSentData
@@ -335,26 +335,27 @@ function serialData = processSerialData(runtimeDataPath, forceProcessAllData, cu
     end
     
     % If sent serial data is not loaded or has only one column, read it from raw data files.
-    if isempty(serialData.SerialSentData) || width(serialData.SerialSentData) == 1
+    if isempty(serialSentData) || width(serialSentData) == 1
         % Read sent serial data from raw data files.
-        serialData.SerialSentData.Raw = ReadDataFiles(sentPath, '*SerialSentData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
-        serialData.SerialSentData.Raw = AddSubjectAndSession(serialData.SerialSentData.Raw, subjectNum, sessionNum);
+        serialSentData.Raw = ReadDataFiles(sentPath, '*SerialSentData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialSentData.Raw = AddSubjectAndSession(serialSentData.Raw, subjectNum, sessionNum);
         
         % Save the processed sent serial data to the current processed data path.
-        SaveDataCheckCompleteFile('serialSentData', serialData.SerialSentData, currentProcessedDataPath);
+        SaveDataCheckCompleteFile('serialSentData', serialSentData, currentProcessedDataPath);
     end
     
     % If received serial data is not loaded or has only one column, read it from raw data files.
-    if isempty(serialData.SerialRecvData) || width(serialData.SerialRecvData) == 1
+    if isempty(serialRecvData) || width(serialRecvData) == 1
         % Read received serial data from raw data files.
-        serialData.SerialRecvData.Raw = ReadDataFiles(recvPath, '*SerialRecvData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
-        serialData.SerialRecvData.Raw = AddSubjectAndSession(serialData.SerialRecvData.Raw, subjectNum, sessionNum);
-        serialData.SerialRecvData = ParseSyncboxData(serialData.SerialRecvData);
-
+        serialRecvData.Raw = ReadDataFiles(recvPath, '*SerialRecvData*.txt', 'importOptions', {'delimiter', '\t', 'TreatAsEmpty',{'None'}});
+        serialRecvData.Raw = AddSubjectAndSession(serialRecvData.Raw, subjectNum, sessionNum);
+        % serialRecvData = ParseSyncboxData(serialRecvData);
+        serialRecvData.Analog = euUSE_parseSerialRecvDataAnalog(serialRecvData.Raw);
+        [ serialRecvData.SynchA serialRecvData.SynchB serialRecvData.RwdA serialRecvData.RwdB serialRecvData.EventCodes] = euUSE_parseSerialRecvData( serialRecvData.Raw, 'word' );
         
         
         % Save the processed received serial data to the current processed data path.
-        SaveDataCheckCompleteFile('serialRecvData', serialData.SerialRecvData, currentProcessedDataPath);
+        SaveDataCheckCompleteFile('serialRecvData', serialRecvData, currentProcessedDataPath);
     end
 end
 
