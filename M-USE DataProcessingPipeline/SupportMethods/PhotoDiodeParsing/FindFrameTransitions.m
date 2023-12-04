@@ -43,12 +43,32 @@ for windowStart = 1:stepSize-1:length(lightData)
     [peaks, iPeaks] = findpeaks(windowData);
     [troughs, iTroughs] = findpeaks(-windowData);
 
-    %find local threshold, save it with the midpoint of the window
+    %check for plateaus
+    for i = 1:length(peaks)
+        peak = iPeaks(i);
+        if (windowData(peak + 1) == windowData(peak))
+            plateauEnd = find(windowData(peak:end) ~= windowData(peak), 1) + peak - 1;
+            iPeaks(i) = plateauEnd - 1;
+        end
+    end
+    %check for plateaus
+    for i = 1:length(troughs)
+        peak = iTroughs(i);
+        if (windowData(peak + 1) == windowData(peak))
+            plateauEnd = find(windowData(peak:end) ~= windowData(peak), 1) + peak - 1;
+            iTroughs(i) = plateauEnd - 1;
+        end
+    end
+
+    %find local threshold,
     threshold = mean(windowData);
     % windowMeans = [windowMeans; windowStart + round(height(windowData)/2) threshold]; %#ok<AGROW>
 
-    %combine peaks and troughs
+    %combine peaks and troughs, sort them by time point (index)
     combined = sortrows([iPeaks, peaks; iTroughs, windowData(iTroughs)]);
+
+    %apply rule: trough to peak is a trough below threshold followed by a 
+    % peak above threshold, peak to trough is the reverse
     ttop = combined(combined(1:end-1,2) < threshold & combined(2:end,2) > threshold,:);
     ptot = combined(combined(1:end-1,2) > threshold & combined(2:end,2) < threshold,:);
 

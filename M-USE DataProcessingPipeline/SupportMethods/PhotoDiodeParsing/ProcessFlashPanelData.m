@@ -8,29 +8,61 @@ panels, and does various clever timing checks with them
 analogData: the Analog field of an M-USE SerialRecvData folder, 
 
 %}
-%%
+
+%% Constants
 
 frameRate = 60;
 expectedFrameDur = 1/frameRate;
 
 upsampleRate = 10000;
 
-t_orig = serialRecvData.Analog.SynchBoxTime;
-t_upsample = t_orig(1) : 1/upsampleRate : t_orig(end);
+expectedLeft = [0 1]';
+expectedRight = [0 0 0  0 0 1  0 1 0  0 1 1  1 0 0  1 0 1  1 1 0  1 1 1]';
+
+%% Find Frame Onsets, Flip to Flip Details
+
+
+disp("Finding frame onsets in raw data")
+
 
 analog_orig = serialRecvData.Analog(:,["UnityRecvFrame", "SynchBoxTime", "LightL", "LightR"]);
+disp("    Left signal")
+[flipDetailsL, flipSummaryL] = GetFrameAnalogDetails(analog_orig, "LightL", expectedFrameDur, 600);
+disp(flipSummaryL);
+disp("    Right signal")
+[flipDetailsR, flipSummaryR] = GetFrameAnalogDetails(analog_orig, "LightR", expectedFrameDur, 600);
+disp(flipSummaryR);
 
-analog_upsample = array2table(interp1(t_orig, table2array(analog_orig(:,2:4)), t_upsample), 'VariableNames', ["SynchBoxTime", "LightL", "LightR"]);
-
-[analogFrameDetailsL, frameSummaryL] = GetFrameAnalogDetails(analog_orig, "LightL", expectedFrameDur, 600);
-[analogFrameDetailsR, frameSummaryR] = GetFrameAnalogDetails(analog_orig, "LightR", expectedFrameDur, 600);
+%% Find Closest Upsampled Frame Onsets, Corrected Flip To Flip Details
 
 
-[analogFrameDetailsL_upsample, frameSummaryL_upsample] = GetFrameAnalogDetails(analog_upsample, 'LightL', expectedFrameDur, 20000);
+disp("Finding upsampled flip times")
+t_orig = serialRecvData.Analog.SynchBoxTime;
+t_upsample = t_orig(1) : 1/upsampleRate : t_orig(end);
+upsampledFlipIndices = FindClosestWithWindow(t_upsample, flipDetailsL.SynchBoxTime);
 
-analog_upsample.FlashPanelStatus = GetUpsampledFlashPanelStatus(height(analog_upsample), analogFrameDetailsL_upsample);
+[correctedFlipTimes, ~] = FindIdealFlipTimes(t_upsample, upsampledFlipIndices, frameRate, 20, 0.02, 1, 0.002);
 
-FrameOnsets = findIdealFrameOnsets(analog_upsample, 60, 10000, 100, 0.02);
+closestIndicesL = FindClosestWithWindow(correctedFlipTimes, flipDetailsL.SynchBoxTime);
+closestIndicesR = FindClosestWithWindow(correctedFlipTimes, flipDetailsR.SynchBoxTime);
+
+flipDetailsL.CorrectedTime = correctedFlipTimes(closestIndicesL)';
+flipDetailsR.CorrectedTime = correctedFlipTimes(closestIndicesR)';
+
+%find out proportions of detected flips that aren't close to corrected
+%times
+
+flipDetailsL.NumFrames = [diff(closestIndicesL); NaN];
+flipDetailsR.NumFrames = [diff(closestIndicesR); NaN];
+
+discretizedFramesL = GenerateDiscretizedFrameVector(flipDetailsL);
+discretizedFramesR = GenerateDiscretizedFrameVector(flipDetailsR);
+
+
+[frameDetailsL, exceptionDetailsL] = FlashPanelPatternProcessor(discretizedFramesL, expectedLeft);
+[frameDetailsR, exceptionDetailsR] = FlashPanelPatternProcessor(discretizedFramesR, expectedRight);
+% problemFramesL = DetectPatternViolations(discretizedFramesL, expectedLeft, 600);
+% problemFramesR = DetectPatternViolations(discretizedFramesR, expectedRight, 600);
 
 
 fred = 2;
@@ -51,13 +83,24 @@ analogFrameData.AnalogIndex  = allTransitions(:,1);
 time = analogFrameData.SynchBoxTime;
 duration = diff(time);
 analogFrameData.Duration = [duration; NaN];
-
-frameSummary.MeanFrameDuration = mean(duration);
-frameSummary.MedianFrameDuration =median(duration);
-
 analogFrameData.Threshold = allTransitions(:,3);
 analogFrameData.FlashPanelStatus = analogFrameData.(column) < allTransitions(:,3);
-analogFrameData.ProblemFrame = [abs(expectedFrameDur - duration) > 0.5; NaN];
+analogFrameData.OneMsOff = [abs(expectedFrameDur - duration) > 0.001; NaN];
+analogFrameData.FiveMsOff = [abs(expectedFrameDur - duration) > 0.005; NaN];
+
+
+frameSummary.MeanFtoFDuration = mean(duration);
+frameSummary.MedianFtoFDuration = median(duration);
+frameSummary.FtoFStdDev = std(duration);
+frameSummary.FtoFStdErr = std(duration) ./ (length(duration) - 1) ^ 2;
+frameSummary.NumFlips = length(duration);
+frameSummary.NumGoodFlips = length(duration) - sum(analogFrameData.OneMsOff, 'omitnan');
+frameSummary.NumFlipsOneMsOff = sum(analogFrameData.OneMsOff, 'omitnan');
+frameSummary.NumFlipsFiveMsOff = sum(analogFrameData.FiveMsOff, 'omitnan');
+frameSummary.PropGoodFlips = frameSummary.NumGoodFlips / length(duration);
+frameSummary.PropFlipsOneMsOff = frameSummary.NumFlipsOneMsOff / length(duration);
+frameSummary.PropFlipFiveMsOff = frameSummary.NumFlipsFiveMsOff / length(duration);
+
 
 
 
@@ -79,7 +122,7 @@ end
 
 
 
-function FrameOnsets = findIdealFrameOnsets(analogData, frameRate, sampleRate, windowSizeFrames, maxLag)
+function FrameOnsets = findIdealFrameOnsets(analogData, frameRate, sampleRate, windowSizeSeconds, maxLag)
 %%
 %{
 frameRate - of the monitor
@@ -90,26 +133,46 @@ maxLag - max lag for xcorr in s
 
 frameDur = 1 / frameRate;
 
-t = analogData.SynchBoxTime;
-tnorm = t - t(1);
 
-windowSizeSeconds = windowSizeFrames * frameDur;
+windowSizeFrames = windowSizeSeconds / frameDur;
 
 idealTemplate = zeros(ceil(windowSizeSeconds * 1 / sampleRate), 1);
-for timer = 0 : frameDur * 2 : windowSizeSeconds - frameDur * 2
 
-    idealTemplate(tnorm >= timer & tnorm < timer + frameDur) = 1;
+windowSizeSamples = windowSizeSeconds * sampleRate;
+frameSizeSamples = round(frameDur * sampleRate);
 
-end
+
+bToW = [zeros(1, frameSizeSamples) ones(1, frameSizeSamples)];
+
+idealTemplate = repmat(bToW, 1, ceil(windowSizeFrames/2));
+
+t = analogData.SynchBoxTime;
+% tnorm = t - t(1);
+% end
 
 rs = [];
 lags = [];
 matches = [];
+correctedStatus = [];
 maxLagSamples = maxLag / (1 / sampleRate);
-for timer = 0 : windowSizeSeconds : tnorm(end)
-    windowStart = find(tnorm > timer, 1) - 1;
+
+
+for timer = t(1) : windowSizeSeconds : t(end)
+    windowStart = find(t > timer, 1) - 1;
     measuredWindow = analogData.FlashPanelStatus(windowStart : min(windowStart + length(idealTemplate) - 1, end));
-    [r, lag] = xcorr(idealTemplate, measuredWindow, maxLagSamples);
+    windowT = analogData.SynchBoxTime(windowStart : min(windowStart + length(idealTemplate) - 1, end));
+    windowTNorm = windowT - windowT(1);
+
+    %generate accurately-timed ideal sample
+    timer = windowTNorm(1);
+
+    idealOnsets = windowTNorm(1):frameDur:windowTNorm(end);
+    idealSignal = zeros(length(measuredWindow), 1);
+    for iFrame = 1:2:windowSizeFrames
+        idealSignal(windowTNorm >= idealOnsets(iFrame) & windowTNorm < idealOnsets(iFrame + 1)) = 1;
+    end
+
+    [r, lag] = xcorr(idealSignal, measuredWindow, maxLagSamples);
     % display(max(r))
     matches = [matches; min(lag(r==max(r)))];
 end

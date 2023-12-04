@@ -269,7 +269,7 @@ Rep_Sig = repmat(RFv',[round(length(orig_t)/length(RFv)),1])';
 Crr_Win = 600;%round(length(Rep_Sig)/2);
 Crr_offset = 600;
 
-dt2 = 1/fs2;
+dt2 = 1/fs2; %delta T of upsampled signal
 t_intp = [0:dt2:NumCycle]';
 y_pChip = interp1(orig_t, [Rep_Sig,Rep_Sig(1)], t_intp,'nearest')-.5;
 plot(y_pChip)
@@ -283,6 +283,7 @@ ishift =[];
 iMax =[];
 Rec_SignalR =[];
 Rec_SignalR2 = [];
+
 for i = 1:length(signal_parts)-1
     p_Norm_vecR = intp_logic_photoR(signal_parts(i)+1:signal_parts(i+1));
     L_part = length(p_Norm_vecR);
