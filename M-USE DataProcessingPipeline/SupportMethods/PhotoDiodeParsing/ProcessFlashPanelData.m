@@ -1,4 +1,4 @@
-function ProcessFlashPanelData(serialRecvData)
+function [frameDetailsL, exceptionDetailsL, frameDetailsR, exceptionDetailsR] = ProcessFlashPanelData(serialRecvData)
 %%
 %{
 
