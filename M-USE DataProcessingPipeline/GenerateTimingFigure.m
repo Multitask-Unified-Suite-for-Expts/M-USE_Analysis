@@ -4,7 +4,8 @@ function figureData = GenerateTimingFigure(serialRecvData)
 
     frameDetailsR = figureData.frameDetailsR;
 
-    unexpectedFrameSequenceIdxs = FindUnexpectedFrameSequences(frameDetailsR);
+    unexpectedFrameSequenceIdxs = FindContinuousFrameSequences(frameDetailsR, 0);
+    expectedFrameSequenceIdxs = FindContinuousFrameSequences(frameDetailsR, 1);
 
     %find all unexpected sequences with a specified width and buffer of
     %good data around
