@@ -141,6 +141,10 @@ function processAllDataTypes(runtimeDataPath, currentTaskName, forceProcessAllDa
     
     % Load or process serial data
     processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+    
+    % Process flash panel data
+    [ frameDetailsL, exceptionDetailsL, frameDetailsR, exceptionDetailsR, orderedMatrices, frameCounts] = HandleFrameDetails(serialRecvData, frameData);
+
 end
 
 function processTaskSelectionDataTypes(runtimeDataPath, currentTaskSelectionFolderName, forceProcessAllData, currentProcessedDataPath, ...
@@ -161,6 +165,10 @@ function processTaskSelectionDataTypes(runtimeDataPath, currentTaskSelectionFold
     
     % Load or process serial data
     [serialSentData, serialRecvData] = processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
+
+    % Process flash panel data
+    [ frameDetailsL, exceptionDetailsL, frameDetailsR, exceptionDetailsR, orderedMatrices, frameCounts] = HandleFrameDetails(serialRecvData, frameData);
+
 end
 
 
@@ -353,11 +361,11 @@ function [serialSentData, serialRecvData] = processSerialData(runtimeDataPath, f
         serialRecvData.Analog = euUSE_parseSerialRecvDataAnalog(serialRecvData.Raw);
         [ serialRecvData.SynchA serialRecvData.SynchB serialRecvData.RwdA serialRecvData.RwdB serialRecvData.EventCodes] = euUSE_parseSerialRecvData( serialRecvData.Raw, 'word' );
         
-        
         % Save the processed received serial data to the current processed data path.
         SaveDataCheckCompleteFile('serialRecvData', serialRecvData, currentProcessedDataPath);
     end
 end
+
 
 %% Helper Functions
 

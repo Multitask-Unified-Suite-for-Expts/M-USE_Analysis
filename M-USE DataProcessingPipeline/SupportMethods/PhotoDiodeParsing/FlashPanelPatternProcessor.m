@@ -1,5 +1,8 @@
 function [frameDetails, exceptionDetails] = FlashPanelPatternProcessor(discretizedFrames, expectedPattern)
 
+    discretizedFrames = discretizedFrames(:,1);
+    discretizedFrames(isnan(discretizedFrames)) = [];
+
     % Matrix of all possible orders of the pattern
     patternTemplate = zeros(length(expectedPattern), length(expectedPattern));
     % Loop to fill in the matrix

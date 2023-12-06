@@ -1,7 +1,8 @@
 function [accurateReportings] = HandleFrameDetails(serialRecvData, frameDetails)
     figureData = ProcessFlashPanelData(serialRecvData);
     
-    
+    % Process frameDetailsL
+    frameDetails = framef
     % [~, idx, ~] = unique(frameData.Frame, 'stable');
     % duplicates = frameData(ismember(1:height(frameData), idx), :);
     % 
