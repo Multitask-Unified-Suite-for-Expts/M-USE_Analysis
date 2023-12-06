@@ -7,14 +7,7 @@ function figureData = GenerateTimingFigure(serialRecvData)
 
     [figureAnalogData, figureFlipDetails, figureDiscretizedData] = convert_frame_details_to_analog_data(figureFrameDetails, figureData);
 
-    % Assuming figureFrameDetails is a table with a column named Accuracy
-    % Assuming figureFrameDetails is a table with a column named Accuracy
-badFrameIdx = find(figureFrameDetails(:, 2) == 0);
-badFrameDiscretizedIdx = figureFrameDetails(badFrameIdx, 4);
-badFrameFlipIdx = figureData.discretizedFramesR(badFrameDiscretizedIdx, 2);
-badFrameAnalogIdx = figureData.flipDetailsR(badFrameFlipIdx, :);
 
-badFrameAnalogData = figureData.analog_orig(badFrameAnalogIdx, :);
     
     % Plot the analog data
     hold on
