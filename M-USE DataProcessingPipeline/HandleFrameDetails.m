@@ -1,12 +1,14 @@
-function [accurateReportings] = HandleFrameDetails(serialRecvData, frameDetails)
-    figureData = ProcessFlashPanelData(serialRecvData);
+function [accurateReportings] = HandleFrameDetails(serialRecvData, figureData)
+    % figureData = ProcessFlashPanelData(serialRecvData);
     
-    
+    frameDetails = figureData.frameDetailsR;
     % [~, idx, ~] = unique(frameData.Frame, 'stable');
     % duplicates = frameData(ismember(1:height(frameData), idx), :);
     % 
     % newFrameData = duplicates;
     %accurateReportings = ProcessFrameDetails_OnlyAccurate(frameDetails);
+badFrameDetails = GetBadFrameDetails(frameDetails);
+
     [accurateReportings] = ProcessFrameDetails_Both(frameDetails);
 
     % Display the ordered matrices
@@ -16,6 +18,21 @@ function [accurateReportings] = HandleFrameDetails(serialRecvData, frameDetails)
         disp(accurateReportings{i});
     end
 end
+
+function badFrameDetails = GetBadFrameDetails(frameDetails)
+    % 
+    % ibadFrameDetails = find(frameDetails(:,2) == 0);
+    % badFrameDetails = [frameDetails(ibadFrameDetails) ibadFrameDetails];
+
+
+    % Find indices where the second column transitions from 1 to 0 or 0 to 1
+    transitionIndices = find(diff(frameDetails{:, 2}) ~= 0);
+    firstBadFrame = find(frameDetails{:,2} == 0,1);
+    badSegmentStarts = [firstBadFrame
+    fred = 2;
+
+end
+
 
 function [orderedMatrices] = ProcessFrameDetails_OnlyAccurate(frameDetails)
     % Find indices where the second column transitions from 1 to 0
