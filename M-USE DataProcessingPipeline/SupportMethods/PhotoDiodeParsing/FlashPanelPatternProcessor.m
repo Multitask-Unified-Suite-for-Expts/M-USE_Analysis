@@ -10,7 +10,7 @@ function [frameDetails, exceptionDetails] = FlashPanelPatternProcessor(discretiz
         patternTemplate(:, i) = circshift(expectedPattern, i - 1);
     end
     
-    patternMatchers = GeneratePatternMatchers(patternTemplate, length(expectedPattern));
+    patternMatchers = GeneratePatternMatchers(patternTemplate, length(discretizedFrames));
     
     iFrame = 1;
     patternCol = 1;
@@ -58,7 +58,7 @@ function [iFrame, patternCol, frameDetails, exceptionDetails] = FindNextMatch(di
         %find if current segment matches any of the columns in
         %patternTemplate
         if iFr <= (size(dFrames,1) - size(patternTemplate,1)) + 1
-            matchCol = FindMatchColumn(patternTemplate, dFrames, iFr);
+            matchCol = FindMatchColumn(patternTemplate, dFrames(1:end), iFr);
         elseif iFr <= size(dFrames,1)
             ht = size(dFrames,1) - iFr + 1;
             %there might be more than one match to patterns shorter than
@@ -80,16 +80,25 @@ function [iFrame, patternCol, frameDetails, exceptionDetails] = FindNextMatch(di
             iFr = iFr + 1;
         else
             %we found the match
-            iFrame = iFrame + iFr - 1; 
-            frameDetails(iFrame, 2:3) = [1 matchCol];
+            
+            if iFrame + iFr - 2 > 0 && frameDetails (iFrame + iFr - 2, 2) == 0
+                % if there is a match and the previous frame was not
+                % matched
+                iFrame = iFrame + iFr - 1;
+                frameDetails(iFrame, 2:3) = [1 matchCol];
+            elseif matchCol == patternCol
+                %there is a match and it is to the same column of the pattern template as the previous frame
+                iFrame = iFrame + iFr;
+                frameDetails(iFrame, 2:3) = [1 matchCol];
+            else %there is a match but to a different column of the pattern template
+                exceptionDetails.Stutter = [exceptionDetails.Stutter; iFrame matchCol];
+                frameDetails(iFrame + iFr, 2:3) = [0 matchCol];
+                iFr = iFr + 1;
+                patternCol = matchCol;
+                matchCol = 0;
+            end
         end
     end
-
-    if matchCol ~= patternCol
-        exceptionDetails.Stutter = [exceptionDetails.Stutter; iFrame matchCol];
-            frameDetails(iFrame, 2:3) = [0 matchCol];
-    end
-
     patternCol = matchCol;
 
 end
@@ -103,6 +112,13 @@ function matchCol = FindMatchColumn(patternTemplate, dFrames, iFr, varargin)
     end
     if length(matchCol) > 1
         disp('ERROR - more than one column match identified')
+    elseif isempty(matchCol)
+        % dFrames = dFrames(1:end-1,:);
+        patternTemplate = patternTemplate(1:end-1,:);
+        %there might be more than one match to patterns shorter than
+        %the template, so loop around from the currently selected pattern
+        %column to
+        matchCol = FindMatchColumn(patternTemplate, dFrames, iFr, 1);
     end
     
 end
@@ -132,14 +148,15 @@ function [iFrame, frameDetails, exceptionDetails, exceptionFound] = FindNextExce
         while length(pm) > 1
             pm = pm(1:end-1);
             if isequal(pm(1:min([length(pm) length(dFrames)])), dFrames(1:min([length(pm) length(dFrames)]))) %perfect match
-                frameDetails(iFrame + 1 : iFrame + length(pm), 2:3) = repmat([1 patternCol], length(pm),1);
-                iFrame = iFrame + length(pm);
+                frameDetails(iFrame + 1 : iFrame + length(pm) - 1, 2:3) = repmat([1 patternCol], length(pm) - 1,1);
+                iFrame = iFrame + length(pm) + 1;
+                frameDetails(iFrame, 2:3) = [0 0];
                 exceptionDetails.PatternBreak = [exceptionDetails.PatternBreak; iFrame patternCol];
                 break;
             elseif length(pm) == 1
 
-                frameDetails(iFrame + 1, 2:3) = [0 patternCol];
-                iFrame = iFrame + 1;
+                frameDetails(iFrame, 2:3) = [0 patternCol];
+                iFrame = iFrame + 2;
                 exceptionDetails.PatternBreak = [exceptionDetails.PatternBreak; iFrame patternCol];
             end
         end

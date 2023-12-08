@@ -63,7 +63,7 @@ function [processedPanelOutput, unassignedDetectedFrames] = FindMatchedFrames(pr
     if ~isequal(comparison(:, 1), comparison(:, 2))
         
         shiftFactor = 0;
-        sequenceIs(2) = sequenceIs(2) - 1;
+        % sequenceIs(2) = sequenceIs(2) - 1;
         breakOccurred = false;  % Initialize the variable
     
         % Keep shifting until the sequences match or lag reaches a limit
@@ -71,7 +71,8 @@ function [processedPanelOutput, unassignedDetectedFrames] = FindMatchedFrames(pr
             %disp("SHIFTING")
             lag = lag + 1;
     
-             if (lag == 24)
+             if (lag > 24)
+                 lag = 1;
                  breakOccurred = true;
                  disp(["LAG " lag]);
                  break;
@@ -93,7 +94,11 @@ function [processedPanelOutput, unassignedDetectedFrames] = FindMatchedFrames(pr
         end
 
         if ~breakOccurred
-            processedPanelOutput.discretizedFramesR.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(lag:lag+length(detectedFrameStatus) - 2);
+            try
+                processedPanelOutput.discretizedFramesR.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(lag:lag+length(detectedFrameStatus) - 1);
+            catch
+                fred = 2;
+            end
         else
             unassignedDetectedFrames{end + 1, 1} = detectedFrameStatus;
     
@@ -102,7 +107,7 @@ function [processedPanelOutput, unassignedDetectedFrames] = FindMatchedFrames(pr
     
     else
        % disp("EQUALITY")
-        processedPanelOutput.discretizedFramesR.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(lag:lag+length(detectedFrameStatus) - 1);
+        processedPanelOutput.discretizedFramesR.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(1:length(detectedFrameStatus));
     end
 end
 
@@ -120,7 +125,7 @@ function [frameData] = AssignDiscretizedDataFieldsToFrameData(frameData, process
         matchingRows = frameData.Frame == frameVal;
         
         % Assign the UnityRecvFrame to the frameData.DetectedFrameOnset
-        frameData.DetectedFrameOnset(matchingRows) = discretizedDataWithMatchingFrames.UnityRecvFrame(iMatching);
+        frameData.DetectedFrameOnset(matchingRows) = processedPanelOutput.flipDetailsR.CorrectedTime(discretizedDataWithMatchingFrames.FlipIndex(iMatching))0;
         
         % Assign the original index to the frameData.DiscretizedFrameIndex
         frameData.DiscretizedFrameIndex(matchingRows) = discretizedDataWithMatchingFrames.RowIndices(iMatching);
