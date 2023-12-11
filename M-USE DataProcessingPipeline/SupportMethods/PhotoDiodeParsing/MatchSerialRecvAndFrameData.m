@@ -5,7 +5,8 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
 
     
     processedPanelOutput.discretizedFramesR.UnityMatchedFrame = nan(height(processedPanelOutput.discretizedFramesR),1);
-    frameData.FlashPanelRStatusMatchingExpected = nan(height(frameData), 1);    
+    processedPanelOutput.discretizedFramesL.UnityMatchedFrame = nan(height(processedPanelOutput.discretizedFramesL),1);
+    frameData.FlashPanelRValidity = nan(height(frameData), 1);    
     frameData.DetectedFrameOnset = nan(height(frameData), 1);
     frameData.DiscretizedFrameIndex = nan(height(frameData), 1);
     frameData.DiscretizedFlipIndex = nan(height(frameData), 1);
@@ -17,23 +18,21 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
     frameData = duplicates;
 
     expectedFrameSequenceIdxsR = FindContinuousFrameSequences(processedPanelOutput.frameDetailsR, 1);
-    expectedFrameSequenceIdxsL = FindContinuousFrameSequences(processedPanelOutput.frameDetailsL, 1);
-
     for iSeq = 1:size(expectedFrameSequenceIdxsR,1)
         [processedPanelOutput.discretizedFramesR] = FindMatchedFrames(processedPanelOutput.discretizedFramesR, processedPanelOutput.flipDetailsR, expectedFrameSequenceIdxsR(iSeq,:), frameData);
     end
 
-    
+    [processedPanelOutput.discretizedFramesL] = AssignMatchedFramesToDiscretizedFramesLeft(processedPanelOutput);
     matchedFrameData = AssignDiscretizedDataFieldsToFrameData(frameData, processedPanelOutput);
     fred = 2;
 end
 
-function [discretizedFrames] = FindMatchedFrames(discretizedFrames, flipDetails, sequenceIs, frameData)
+function [discretizedFramesR] = FindMatchedFrames(discretizedFramesR, flipDetails, sequenceIs, frameData)
 
     if(sequenceIs(1) == sequenceIs(2))
-        discFrameVals = discretizedFrames(sequenceIs(1),:);
+        discFrameVals = discretizedFramesR(sequenceIs(1),:);
     else
-        discFrameVals = discretizedFrames(sequenceIs(1):(sequenceIs(2)-1),:);
+        discFrameVals = discretizedFramesR(sequenceIs(1):(sequenceIs(2)-1),:);
     end
         flipDetailVals = flipDetails(max(discFrameVals{1,2} - 24, 1) : min(discFrameVals{end,2} + 24, end),:);
     
@@ -42,22 +41,6 @@ function [discretizedFrames] = FindMatchedFrames(discretizedFrames, flipDetails,
     
     originalReportedFrameStatus = frameVals.FlashPanelRStatus;
     detectedFrameStatus = discFrameVals.Pattern;
-    
-    % % Cross-correlation
-    % [rs, lags] = xcorr(originalReportedFrameStatus, detectedFrameStatus, 24);
-    % 
-    % % Find the lag that maximizes the cross-correlation
-    % lag = max(lags(rs == max(rs))) + 1;
-    % 
-    % % Check if there is a need for adjustment
-    % if lag > 0
-    %     % Adjust reportedFrameStatus based on the lag
-    %     reportedFrameStatus = [originalReportedFrameStatus(lag:end); originalReportedFrameStatus(1:lag-1)];
-    % else
-    %     % Adjust for the case when lag is negative
-    %     lag = 0;
-    %     reportedFrameStatus = originalReportedFrameStatus;
-    % end
 
     lag = 0;
     reportedFrameStatus = originalReportedFrameStatus;
@@ -78,7 +61,7 @@ function [discretizedFrames] = FindMatchedFrames(discretizedFrames, flipDetails,
         breakOccurred = false;  % Initialize the variable
     
         % Keep shifting until the sequences match or lag reaches a limit
-        while sum(abs(diff(comparison(1:end-1, :), 1, 2))) ~= 0
+        while ~isequal(comparison(:, 1), comparison(:, 2))
             %disp("SHIFTING")
             lag = lag + 1;
     
@@ -89,7 +72,7 @@ function [discretizedFrames] = FindMatchedFrames(discretizedFrames, flipDetails,
                  break;
              end
     
-            discFrameVals = discretizedFrames(sequenceIs(1):(sequenceIs(2)-1), :);
+            discFrameVals = discretizedFramesR(sequenceIs(1):(sequenceIs(2)-1), :);
             flipDetailVals = flipDetails(max(discFrameVals{1, 2} - 24, 1) : min(discFrameVals{end, 2} + 24, end), :);
     
             frameVals = frameData(frameData.Frame >= flipDetailVals.UnityRecvFrame(1) & frameData.Frame <= flipDetailVals.UnityRecvFrame(end), :);
@@ -104,17 +87,46 @@ function [discretizedFrames] = FindMatchedFrames(discretizedFrames, flipDetails,
             comparison = [reportedFrameStatus(1:length(detectedFrameStatus)), detectedFrameStatus];
         end
 
-        if ~breakOccurred
-            try
-                discretizedFrames.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(lag:lag+length(detectedFrameStatus) - 1);
-            catch
-                fred = 2;
-            end
-        end
-    
+        
+        discretizedFramesR.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(lag:lag+length(detectedFrameStatus) - 1);
+            
     else
        % disp("EQUALITY")
-        discretizedFrames.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(1:length(detectedFrameStatus));
+        discretizedFramesR.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(1:length(detectedFrameStatus));
+    end
+end
+
+function [discFramesL] = AssignMatchedFramesToDiscretizedFramesLeft(processedPanelOutput)
+    
+    % Find the rows in the discretizedFramesR that have a matched Frame 
+    validRowsInDiscretizedFramesR = find(~isnan(processedPanelOutput.discretizedFramesR.UnityMatchedFrame));
+    
+    % Get a reference to the discretizedFramesL
+    discFramesL = processedPanelOutput.discretizedFramesL;
+    
+    % Loop through each valid row in discretizedFramesR
+    for iDiscFramesR = 1:height(validRowsInDiscretizedFramesR)
+        
+        % Find the Flip Index for each row with a matched Frame
+        discFramesR = validRowsInDiscretizedFramesR(iDiscFramesR);
+        flipIndexR = processedPanelOutput.discretizedFramesR.FlipIndex(discFramesR);
+        
+        % Find the corresponding Flip Index in flipDetailsL
+        flipIndexL = find(processedPanelOutput.flipDetailsL.CorrectedTime == processedPanelOutput.flipDetailsR.CorrectedTime(flipIndexR));
+        
+        % Check if a match was not found
+        if(isempty(flipIndexL))
+            % If no match is found, skip to the next iteration
+            % disp(["Match wasn't found for " processedPanelOutput.flipDetailsR.CorrectedTime(flipIndexR) ", moving onto the next frame."])
+            % val = [val;processedPanelOutput.flipDetailsR.CorrectedTime(flipIndexR)];
+            continue;
+        end
+        
+        % Find the index of the corresponding row in discretizedFramesL
+        iDiscFramesL = find(processedPanelOutput.discretizedFramesL.FlipIndex == flipIndexL);
+        
+        % Assign the UnityMatchedFrame value from discretizedFramesR to discretizedFramesL
+        discFramesL.UnityMatchedFrame(iDiscFramesL) = processedPanelOutput.discretizedFramesR.UnityMatchedFrame(discFramesR);
     end
 end
 
@@ -122,28 +134,38 @@ function [frameData] = AssignDiscretizedDataFieldsToFrameData(frameData, process
     % Add a column with row indices to discretizedFramesR
     processedPanelOutput.discretizedFramesR.RowIndices = (1:height(processedPanelOutput.discretizedFramesR))';
 
-    rowsWithMatchingFrames = ~isnan(processedPanelOutput.discretizedFramesR.UnityMatchedFrame);
-    discretizedDataWithMatchingFrames = processedPanelOutput.discretizedFramesR(rowsWithMatchingFrames, :);
+    rowsWithMatchingFramesR = ~isnan(processedPanelOutput.discretizedFramesR.UnityMatchedFrame);
+    discretizedDataRWithMatchingFrames = processedPanelOutput.discretizedFramesR(rowsWithMatchingFramesR, :);
 
-    for iMatching = 1:height(discretizedDataWithMatchingFrames)
-        frameVal = discretizedDataWithMatchingFrames.UnityMatchedFrame(iMatching);
+    rowsWithMatchingFramesL = ~isnan(processedPanelOutput.discretizedFramesL.UnityMatchedFrame);
+    discretizedDataLWithMatchingFrames = processedPanelOutput.discretizedFramesL(rowsWithMatchingFramesL, :);
+
+    for iDiscRowR = 1:height(discretizedDataRWithMatchingFrames)
+        frameVal = discretizedDataRWithMatchingFrames.UnityMatchedFrame(iDiscRowR);
+        
+        % Find the corresponding row in frameData
+        matchingRow = frameData.Frame == frameVal;
+        
+        % Assign the original index to the frameData.DiscretizedFrameIndex
+        frameData.DiscretizedFrameIndex(matchingRow) = discretizedDataRWithMatchingFrames.RowIndices(iDiscRowR);
+
+        % Assign FlipIndex to the frameData.DiscretizedFlipIndex 
+        frameData.DiscretizedFlipIndex(matchingRow) = discretizedDataRWithMatchingFrames.FlipIndex(iDiscRowR);
+        
+        % Assign the value of whether or not the flashed pattern matched
+        % the expected pattern (Using the Right Panel)
+        frameData.FlashPanelRValidity(matchingRow) = processedPanelOutput.frameDetailsR.Accuracy(iDiscRowR);
+    end
+
+    for iDiscRowL = 1:height(discretizedDataLWithMatchingFrames)
+        frameVal = discretizedDataLWithMatchingFrames.UnityMatchedFrame(iDiscRowL);
         
         % Find the corresponding row in frameData
         matchingRow = frameData.Frame == frameVal;
         
         % Assign the Correct SynchBox Time to the
         % frameData.DetectedFrameOnset (Using Left Panel)
-        frameData.DetectedFrameOnset(matchingRow) = processedPanelOutput.flipDetailsL.CorrectedTime(discretizedDataWithMatchingFrames.FlipIndex(iMatching));
-        
-        % Assign the original index to the frameData.DiscretizedFrameIndex
-        frameData.DiscretizedFrameIndex(matchingRow) = discretizedDataWithMatchingFrames.RowIndices(iMatching);
-
-        % Assign FlipIndex to the frameData.DiscretizedFlipIndex 
-        frameData.DiscretizedFlipIndex(matchingRow) = discretizedDataWithMatchingFrames.FlipIndex(iMatching);
-        
-        % Assign the value of whether or not the flashed pattern matched
-        % the expected pattern (Using the Right Panel)
-        frameData.FlashPanelRStatusMatchingExpected(matchingRow) = processedPanelOutput.frameDetailsR.Accuracy(iMatching);
+        frameData.DetectedFrameOnset(matchingRow) = processedPanelOutput.flipDetailsL.CorrectedTime(discretizedDataLWithMatchingFrames.FlipIndex(iDiscRowL));
     end
 end
 
