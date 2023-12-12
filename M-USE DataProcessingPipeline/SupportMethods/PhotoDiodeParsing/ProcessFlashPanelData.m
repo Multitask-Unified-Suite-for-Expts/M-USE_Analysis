@@ -63,8 +63,8 @@ discretizedFramesR = GenerateDiscretizedFrameVector(flipDetailsR);
 [frameDetailsR, exceptionDetailsR] = FlashPanelPatternProcessor(discretizedFramesR, expectedRight);
 
 % Define column names
-frameDetailsColumnNames = {'Pattern', 'Accuracy', 'PatternOffset'};
-discretizedFramesColumnNames = {'Pattern', 'FlipIndex'};
+frameDetailsColumnNames = {'Status', 'Validity', 'PatternOffset'};
+discretizedFramesColumnNames = {'Status', 'FlipIndex'};
 
 
 % Convert the double array to a table with specified column names

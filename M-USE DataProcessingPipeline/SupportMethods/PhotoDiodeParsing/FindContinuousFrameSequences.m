@@ -4,7 +4,7 @@ function frameSequenceIdxs = FindContinuousFrameSequences(frameDetails, frameVal
     sequenceStart = 0; % Start index of a sequence of 0s
     
     for i = 1:numRows
-        if frameDetails.Accuracy(i) == frameVal
+        if frameDetails.Validity(i) == frameVal
             if sequenceStart == 0
                 sequenceStart = i; % Start of a new sequence
             end
