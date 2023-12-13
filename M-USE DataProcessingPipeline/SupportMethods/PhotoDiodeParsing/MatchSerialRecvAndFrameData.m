@@ -6,10 +6,10 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
     
     processedPanelOutput.discretizedFramesR.UnityMatchedFrame = nan(height(processedPanelOutput.discretizedFramesR),1);
     processedPanelOutput.discretizedFramesL.UnityMatchedFrame = nan(height(processedPanelOutput.discretizedFramesL),1);
-    frameData.FlashPanelRValidity = nan(height(frameData), 1);    
-    frameData.DetectedFrameOnset = nan(height(frameData), 1);
+    frameData.FrameValidity = nan(height(frameData), 1);    
+    frameData.FrameOnsetSyncBoxTime = nan(height(frameData), 1);
     frameData.DiscretizedFrameIndex = nan(height(frameData), 1);
-    frameData.DiscretizedFlipIndex = nan(height(frameData), 1);
+    frameData.FlipIndex = nan(height(frameData), 1);
 
     
     %Remove the rows that are showing duplicates
@@ -17,9 +17,9 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
     duplicates = frameData(ismember(1:height(frameData), idx), :);
     frameData = duplicates;
 
-    expectedFrameSequenceIdxsR = FindContinuousFrameSequences(processedPanelOutput.frameDetailsR, 1);
-    for iSeq = 1:size(expectedFrameSequenceIdxsR,1)
-        [processedPanelOutput.discretizedFramesR] = FindMatchedFrames(processedPanelOutput.discretizedFramesR, processedPanelOutput.flipDetailsR, expectedFrameSequenceIdxsR(iSeq,:), frameData);
+    validFrameSequenceIdxsR = FindValidFrameSequences(processedPanelOutput.frameDetailsR, 1);
+    for iSeq = 1:size(validFrameSequenceIdxsR,1)
+        [processedPanelOutput.discretizedFramesR] = FindMatchedFrames(processedPanelOutput.discretizedFramesR, processedPanelOutput.flipDetailsR, validFrameSequenceIdxsR(iSeq,:), frameData);
     end
 
     [processedPanelOutput.discretizedFramesL] = AssignMatchedFramesToDiscretizedFramesLeft(processedPanelOutput);
@@ -29,12 +29,14 @@ end
 
 function [discretizedFramesR] = FindMatchedFrames(discretizedFramesR, flipDetails, sequenceIs, frameData)
 
-    if (sequenceIs(1) == sequenceIs(2)) || (sequenceIs(2) > size(discretizedFramesR, 1))
-        discFrameVals = discretizedFramesR(sequenceIs(1),:);
-    else
-        discFrameVals = discretizedFramesR(sequenceIs(1):(sequenceIs(2)-1),:);
-    end
+    % if (sequenceIs(1) == sequenceIs(2)) || (sequenceIs(2) > size(discretizedFramesR, 1))
+    %     discFrameVals = discretizedFramesR(sequenceIs(1),:);
+    % else
+    %     discFrameVals = discretizedFramesR(sequenceIs(1):(sequenceIs(2)-1),:);
+    % end
     
+    discFrameVals = discretizedFramesR(sequenceIs(1):sequenceIs(2),:);
+
     flipDetailVals = flipDetails(max(discFrameVals{1,2} - 24, 1) : min(discFrameVals{end,2} + 24, end),:);
     %flipDetailVals = flipDetails(max(discFrameVals{1,2}, 1) : min(discFrameVals{end,2} + 24, end),:);
 
@@ -47,7 +49,7 @@ function [discretizedFramesR] = FindMatchedFrames(discretizedFramesR, flipDetail
     %     frameVals = frameData(frameData.Frame >= flipDetailVals.UnityRecvFrame(1) & frameData.Frame < flipDetailVals.UnityRecvFrame(end),:);
     % end
 
-    frameVals = frameData(frameData.Frame >= flipDetailVals.UnityRecvFrame(1) & frameData.Frame < flipDetailVals.UnityRecvFrame(end),:);
+    frameVals = frameData(frameData.Frame <= flipDetailVals.UnityRecvFrame(1) & frameData.Frame < flipDetailVals.UnityRecvFrame(end),:);
 
     originalReportedFrameStatus = frameVals.FlashPanelRStatus;
     detectedFrameStatus = discFrameVals.Status;
@@ -90,7 +92,7 @@ function [discretizedFramesR] = FindMatchedFrames(discretizedFramesR, flipDetail
     
             % Update reportedFrameStatus after each shift
             try
-            reportedFrameStatus = [originalReportedFrameStatus(lag:end); originalReportedFrameStatus(1:lag-1)];
+                reportedFrameStatus = [originalReportedFrameStatus(lag:end); originalReportedFrameStatus(1:lag-1)];
             catch
                 disp("out of range")
             end
@@ -175,7 +177,7 @@ function [frameData] = AssignDiscretizedDataFieldsToFrameData(frameData, process
         
         % Assign the value of whether or not the flashed pattern matched
         % the expected pattern (Using the Right Panel)
-        frameData.FlashPanelRValidity(matchingRow) = processedPanelOutput.frameDetailsR.Validity(iDiscRowR);
+        frameData.FrameValidity(matchingRow) = processedPanelOutput.frameDetailsR.Validity(iDiscRowR);
     end
 
     for iDiscRowL = 1:height(discretizedDataWithAMatchedFrameL)
@@ -185,8 +187,8 @@ function [frameData] = AssignDiscretizedDataFieldsToFrameData(frameData, process
         matchingRow = frameData.Frame == frameVal;
         
         % Assign the Correct SynchBox Time to the
-        % frameData.DetectedFrameOnset (Using Left Panel)
-        frameData.DetectedFrameOnset(matchingRow) = processedPanelOutput.flipDetailsL.CorrectedTime(discretizedDataWithAMatchedFrameL.FlipIndex(iDiscRowL));
+        % frameData.FrameOnsetSyncBoxTime (Using Left Panel)
+        frameData.FrameOnsetSyncBoxTime(matchingRow) = processedPanelOutput.flipDetailsL.CorrectedTime(discretizedDataWithAMatchedFrameL.FlipIndex(iDiscRowL));
     end
 end
 

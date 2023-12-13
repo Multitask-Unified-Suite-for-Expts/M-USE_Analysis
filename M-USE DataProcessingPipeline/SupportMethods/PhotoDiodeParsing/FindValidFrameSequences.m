@@ -1,4 +1,4 @@
-function frameSequenceIdxs = FindContinuousFrameSequences(frameDetails, frameVal)
+function frameSequenceIdxs = FindValidFrameSequences(frameDetails, frameVal)
     numRows = size(frameDetails, 1);
     frameSequenceIdxs = [];
     sequenceStart = 0; % Start index of a sequence of 0s
