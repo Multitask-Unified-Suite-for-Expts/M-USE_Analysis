@@ -1,4 +1,7 @@
 function closestIndices = FindClosestWithWindow(TimeStamps, FlipTimes)
+
+%finds the closest 
+
     % Initialize the output vector with zeros
     closestIndices = zeros(size(FlipTimes));
     % Length of the TimeStamps vector

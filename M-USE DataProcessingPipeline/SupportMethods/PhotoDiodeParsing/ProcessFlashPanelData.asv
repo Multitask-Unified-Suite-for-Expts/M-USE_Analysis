@@ -27,10 +27,10 @@ disp("Finding frame onsets in raw data")
 
 analog_orig = serialRecvData.Analog(:,["UnityRecvFrame", "SynchBoxTime", "LightL", "LightR"]);
 disp("    Left signal")
-[detectedFlipDetailsL, flipSummaryL] = GetAnalogFlipOnsetData(analog_orig, "LightL", expectedFrameDur, 600);
+[flipDetailsL, flipSummaryL] = GetAnalogFlipOnsetData(analog_orig, "LightL", expectedFrameDur, 600);
 disp(flipSummaryL);
 disp("    Right signal")
-[detectedFlipDetailsR, flipSummaryR] = GetAnalogFlipOnsetData(analog_orig, "LightR", expectedFrameDur, 600);
+[flipDetailsR, flipSummaryR] = GetAnalogFlipOnsetData(analog_orig, "LightR", expectedFrameDur, 600);
 disp(flipSummaryR);
 
 %% Find Closest Upsampled Frame Onsets, Corrected Flip To Flip Details
@@ -39,21 +39,21 @@ disp(flipSummaryR);
 disp("Finding upsampled flip times")
 t_orig = serialRecvData.Analog.SynchBoxTime;
 t_upsample = t_orig(1) : 1/upsampleRate : t_orig(end);
-upsampledFlipIndices = FindClosestWithWindow(t_upsample, detectedFlipDetailsL.SynchBoxTime);
+upsampledFlipIndices = FindClosestWithWindow(t_upsample, flipDetailsL.SynchBoxTime);
 
 [correctedFlipTimes, ~] = FindIdealFlipTimes(t_upsample, upsampledFlipIndices, frameRate, 20, 0.02, 1, 0.002);
 
-closestIndicesL = FindClosestWithWindow(correctedFlipTimes, detectedFlipDetailsL.SynchBoxTime);
-closestIndicesR = FindClosestWithWindow(correctedFlipTimes, detectedFlipDetailsR.SynchBoxTime);
+closestIndicesL = FindClosestWithWindow(correctedFlipTimes, flipDetailsL.SynchBoxTime);
+closestIndicesR = FindClosestWithWindow(correctedFlipTimes, flipDetailsR.SynchBoxTime);
 
-detectedFlipDetailsL.CorrectedTime = correctedFlipTimes(closestIndicesL)';
-detectedFlipDetailsR.CorrectedTime = correctedFlipTimes(closestIndicesR)';
+flipDetailsL.CorrectedTime = correctedFlipTimes(closestIndicesL)';
+flipDetailsR.CorrectedTime = correctedFlipTimes(closestIndicesR)';
 
-detectedFlipDetailsL.NumFrames = [diff(closestIndicesL); NaN];
-detectedFlipDetailsR.NumFrames = [diff(closestIndicesR); NaN];
+flipDetailsL.NumFrames = [diff(closestIndicesL); NaN];
+flipDetailsR.NumFrames = [diff(closestIndicesR); NaN];
 
-discretizedFramesL = GenerateDiscretizedFrameVector(detectedFlipDetailsL);
-discretizedFramesR = GenerateDiscretizedFrameVector(detectedFlipDetailsR);
+discretizedFramesL = GenerateDiscretizedFrameVector(flipDetailsL);
+discretizedFramesR = GenerateDiscretizedFrameVector(flipDetailsR);
 
 
 [detectedFrameDetailsL, exceptionDetailsL] = FlashPanelPatternProcessor(discretizedFramesL, expectedLeft);
@@ -61,8 +61,8 @@ discretizedFramesR = GenerateDiscretizedFrameVector(detectedFlipDetailsR);
 
 
 % Define column names
-frameDetailsColumnNames = {'Status', 'Validity', 'PatternOffset', 'FlipIndex'};
-% discretizedFramesColumnNames = {'Status', 'FlipIndex'};
+frameDetailsColumnNames = {'Status', 'Validity', 'PatternOffset'};
+discretizedFramesColumnNames = {'Status', 'FlipIndex'};
 
 % Convert the double array to a table with specified column names
 detectedFrameDetailsL = array2table(detectedFrameDetailsL, 'VariableNames', frameDetailsColumnNames);
@@ -75,10 +75,12 @@ detectedFrameDetailsR = array2table(detectedFrameDetailsR, 'VariableNames', fram
 % Create the final struct
 processedPanelOutput = struct(...
     'analog_orig', analog_orig, ...
-    'DetectedFlipsL', detectedFlipDetailsL, ...
-    'DetectedFlipsR', detectedFlipDetailsR, ...
-    'DetectedFramesL', detectedFrameDetailsL, ...
-    'DetectedFramesR', detectedFrameDetailsR, ...
+    'flipDetailsL', flipDetailsL, ...
+    'flipDetailsR', flipDetailsR, ...
+    'discretizedFramesL', discretizedFramesL, ...
+    'discretizedFramesR', discretizedFramesR, ...
+    'frameDetailsL', detectedFrameDetailsL, ...
+    'frameDetailsR', detectedFrameDetailsR, ...
     'exceptionDetailsL', exceptionDetailsL, ...
     'exceptionDetailsR', exceptionDetailsR);
 

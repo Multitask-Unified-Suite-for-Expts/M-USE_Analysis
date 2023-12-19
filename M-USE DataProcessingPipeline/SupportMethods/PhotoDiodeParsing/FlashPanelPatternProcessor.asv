@@ -41,10 +41,8 @@ function [frameDetails, exceptionDetails] = FlashPanelPatternProcessor(discretiz
     %purge short sequences at the beginning 
     iCheckStart = 1;
 
-    while ~isequal(frameDetails(iCheckStart:iCheckStart + length(expectedPattern) -1,2), ones(length(expectedPattern), 1))
-        frameDetails(iCheckStart,2) = 0;
-        iCheckStart = iCheckStart + 1;
-    end
+    while frameDetails(iCheckStart:iCheckStart + length(expectedPattern) -1,2) ~= ones(length(expectedPattern), 1)
+        iCheckStart++;
 
 end
 

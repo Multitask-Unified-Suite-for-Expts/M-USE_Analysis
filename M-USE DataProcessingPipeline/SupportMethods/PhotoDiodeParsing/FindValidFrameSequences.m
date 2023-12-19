@@ -1,10 +1,10 @@
-function frameSequenceIdxs = FindValidFrameSequences(frameDetails, frameVal)
+function frameSequenceIdxs = FindValidFrameSequences(frameDetails, validity)
     numRows = size(frameDetails, 1);
     frameSequenceIdxs = [];
     sequenceStart = 0; % Start index of a sequence of 0s
     
     for i = 1:numRows
-        if frameDetails.Validity(i) == frameVal
+        if frameDetails.Validity(i) == validity
             if sequenceStart == 0
                 sequenceStart = i; % Start of a new sequence
             end

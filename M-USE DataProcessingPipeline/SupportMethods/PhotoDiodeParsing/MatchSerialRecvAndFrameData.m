@@ -13,9 +13,10 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
 
     
     %Remove the rows that are showing duplicates
-    [~, idx, ~] = unique(frameData.Frame, 'stable');
-    duplicates = frameData(ismember(1:height(frameData), idx), :);
-    frameData = duplicates;
+    frameData(diff(frameData.Frame) == 0, :) = [];
+    % [~, idx, ~] = unique(frameData.Frame, 'stable');
+    % nonduplicates = frameData(ismember(1:height(frameData), idx), :);
+    % frameData = nonduplicates;
 
     validFrameSequenceIdxsR = FindValidFrameSequences(processedPanelOutput.frameDetailsR, 1);
     for iSeq = 1:size(validFrameSequenceIdxsR,1)
@@ -27,32 +28,21 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
     fred = 2;
 end
 
-function [discretizedFramesR] = FindMatchedFrames(discretizedFramesR, flipDetails, sequenceIs, frameData)
+function [detectedFrames] = FindMatchedFrames(detectedFrames, detectedFlipDetails, detectedFrameBoundaries, unityReportedFrameData)
 
-    % if (sequenceIs(1) == sequenceIs(2)) || (sequenceIs(2) > size(discretizedFramesR, 1))
-    %     discFrameVals = discretizedFramesR(sequenceIs(1),:);
-    % else
-    %     discFrameVals = discretizedFramesR(sequenceIs(1):(sequenceIs(2)-1),:);
-    % end
-    
-    discFrameVals = discretizedFramesR(sequenceIs(1):sequenceIs(2),:);
 
-    flipDetailVals = flipDetails(max(discFrameVals{1,2} - 24, 1) : min(discFrameVals{end,2} + 24, end),:);
-    %flipDetailVals = flipDetails(max(discFrameVals{1,2}, 1) : min(discFrameVals{end,2} + 24, end),:);
+    %find the frames in frameData that corresponed to the sequence in
+    %DiscretizedFrames that correspond
 
-    % Find where we left off in the matching
-    % lastMatchedFrame = discretizedFramesR.UnityMatchedFrame(find(~isnan(discretizedFramesR.UnityMatchedFrame)));
-    % 
-    % if(~isempty(lastMatchedFrame))
-    %     frameVals = frameData(frameData.Frame > discretizedFramesR.UnityMatchedFrame(find(~isnan(discretizedFramesR.UnityMatchedFrame), 1, 'last')) & frameData.Frame < flipDetailVals.UnityRecvFrame(end),:);
-    % else
-    %     frameVals = frameData(frameData.Frame >= flipDetailVals.UnityRecvFrame(1) & frameData.Frame < flipDetailVals.UnityRecvFrame(end),:);
-    % end
+    %exact window of detected & discretzed frames
+    validDetectedFrameWindow = detectedFrames(detectedFrameBoundaries(1):detectedFrameBoundaries(2),:);
 
-    frameVals = frameData(frameData.Frame <= flipDetailVals.UnityRecvFrame(1) & frameData.Frame < flipDetailVals.UnityRecvFrame(end),:);
+    %flipDetails contains frames in which unity received syncbox data
+    flipDetailVals = detectedFlipDetails(max(validDetectedFrameWindow{1,2} - 24, 1) : min(validDetectedFrameWindow{end,2} + 24, end),:);
+    frameVals = unityReportedFrameData(unityReportedFrameData.Frame <= flipDetailVals.UnityRecvFrame(1) & unityReportedFrameData.Frame < flipDetailVals.UnityRecvFrame(end),:);
 
     originalReportedFrameStatus = frameVals.FlashPanelRStatus;
-    detectedFrameStatus = discFrameVals.Status;
+    detectedFrameStatus = validDetectedFrameWindow.Status;
 
     lag = 0;
     reportedFrameStatus = originalReportedFrameStatus;
@@ -101,19 +91,19 @@ function [discretizedFramesR] = FindMatchedFrames(discretizedFramesR, flipDetail
         end
 
         try
-            discretizedFramesR.UnityMatchedFrame(sequenceIs(1):(sequenceIs(2)-1)) = frameVals.Frame(lag:lag+length(detectedFrameStatus) - 1);
+            detectedFrames.UnityMatchedFrame(detectedFrameBoundaries(1):(detectedFrameBoundaries(2)-1)) = frameVals.Frame(lag:lag+length(detectedFrameStatus) - 1);
         catch
-            discretizedFramesR.UnityMatchedFrame(sequenceIs(1):sequenceIs(1)+height(frameVals.Frame(lag:end))-1) = frameVals.Frame(lag:end);
+            detectedFrames.UnityMatchedFrame(detectedFrameBoundaries(1):detectedFrameBoundaries(1)+height(frameVals.Frame(lag:end))-1) = frameVals.Frame(lag:end);
 
             fred = 2;
         end
     else
        % disp("EQUALITY")
        % Determine the valid range based on the lengths of sequence and frameVals.Frame
-    range = sequenceIs(1):(sequenceIs(1) + length(frameVals.Frame(1:length(detectedFrameStatus))) - 1);
+    range = detectedFrameBoundaries(1):(detectedFrameBoundaries(1) + length(frameVals.Frame(1:length(detectedFrameStatus))) - 1);
 
     % Update only the existing rows in discretizedFramesR.UnityMatchedFrame
-    discretizedFramesR.UnityMatchedFrame(range) = frameVals.Frame(1:length(detectedFrameStatus));
+    detectedFrames.UnityMatchedFrame(range) = frameVals.Frame(1:length(detectedFrameStatus));
 
     end
 end
