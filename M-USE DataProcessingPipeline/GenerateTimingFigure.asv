@@ -43,19 +43,19 @@ function figureData = GenerateTimingFigure(serialRecvData)
 % end
 
 % Assuming figureDiscretizedData is a table with two columns named Col1 and Col2
-[~, idx, idxUnique] = unique(figureDetectedFrames.FlipIndex(:), 'stable');
-uniqueDiscretizedData = figureDetectedFrames(idx, :);
+[~, idx, idxUnique] = unique(figureDiscretizedData(:, 2), 'stable');
+uniqueDiscretizedData = figureDiscretizedData(idx, :);
 
 % Create rectangles based on uniqueDiscretizedData
 for i = 1:height(uniqueDiscretizedData)
-    lightValue = uniqueDiscretizedData.Status(i);
-    correspondingFlipRow = uniqueDiscretizedData.FlipIndex(i);
-    correspondingAnalogIndex = figureData.DetectedFlipsR.AnalogIndex(correspondingFlipRow);
+    lightValue = uniqueDiscretizedData{i, 1};
+    correspondingFlipRow = uniqueDiscretizedData{i, 2};
+    correspondingAnalogIndex = figureData.flipDetailsR.AnalogIndex(correspondingFlipRow);
     correspondingSynchTime = figureData.analog_orig.SynchBoxTime(correspondingAnalogIndex);
 
     if lightValue == 0 && i < height(uniqueDiscretizedData)
 
-        correspondingAnalogIndex2 = figureData.DetectedFlipsR.AnalogIndex(correspondingFlipRow + 1);
+        correspondingAnalogIndex2 = figureData.flipDetailsR.AnalogIndex(correspondingFlipRow + 1);
         correspondingSynchTime2 = figureData.analog_orig.SynchBoxTime(correspondingAnalogIndex2);
         % Specify the width of the rectangle
         rectangleWidth = correspondingSynchTime2 - correspondingSynchTime;
@@ -89,7 +89,7 @@ end
 
 function filteredFlipDetails = discretized_data_to_flip_details(discretizedData, flipDetails)
     startFlipDetailsIdx = discretizedData.FlipIndex(1);
-    endFlipDetailsIdx = discretizedData.FlipIndex(height(discretizedData));
+    endFlipDetailsIdx = discretizedData.FlipIndexheight(discretizedData),2};
     
     filteredFlipDetails = flipDetails(startFlipDetailsIdx:endFlipDetailsIdx, :);
 end

@@ -5,13 +5,19 @@ function validSequenceIndices = GetValidSequences(unexpectedFrameSequenceIdxs, s
     for i = 1:numSequences
         width = unexpectedFrameSequenceIdxs(i, 2) - unexpectedFrameSequenceIdxs(i, 1) + 1;
         
-        if width == sequenceWidth
+        if width == sequenceWidth %find unexpected sequence of desired width (e.g. 1)
+
+            %check that size of previous window of expected sequence is >
+            %sequenceBuffer 
             if i == 1
                 prevBuffer = true; % No previous sequence, assume sufficient buffer
             else
                 prevBuffer = (unexpectedFrameSequenceIdxs(i, 1) - unexpectedFrameSequenceIdxs(i-1, 2)) >= sequenceBuffer;
             end
             
+
+            %check that size of next window of expected sequence is >
+            %sequenceBuffer 
             if i == numSequences
                 nextBuffer = true; % No next sequence, assume sufficient buffer
             else

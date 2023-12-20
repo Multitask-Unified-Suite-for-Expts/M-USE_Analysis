@@ -82,6 +82,7 @@ function [iFrame, patternCol, frameDetails, exceptionDetails] = FindNextMatch(di
             %column to
             matchCol = FindMatchColumn(patternTemplate(1:ht,patternCol:end), dFrames, iFr, 1);
             if isempty(matchCol)
+                % matchCol = -1;
                 matchCol = FindMatchColumn(patternTemplate(1:ht,1:patternCol-1), dFrames, iFr);
             end
         else
@@ -129,7 +130,6 @@ function matchCol = FindMatchColumn(patternTemplate, dFrames, iFr, varargin)
     if length(matchCol) > 1
         disp('ERROR - more than one column match identified')
     elseif isempty(matchCol)
-        % dFrames = dFrames(1:end-1,:);
         patternTemplate = patternTemplate(1:end-1,:);
         %there might be more than one match to patterns shorter than
         %the template, so loop around from the currently selected pattern

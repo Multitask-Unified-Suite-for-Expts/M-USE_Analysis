@@ -25,7 +25,11 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
 
     validFrameSequenceIdxsR = FindValidFrameSequences(processedPanelOutput.DetectedFramesR, 1);
     for iSeq = 1:size(validFrameSequenceIdxsR,1)
-        [processedPanelOutput.DetectedFramesR, frameData] = FindMatchingFrames(processedPanelOutput.DetectedFramesR, processedPanelOutput.DetectedFlipsR, validFrameSequenceIdxsR(iSeq,:), frameData, 'FlashPanelRStatus');
+        if validFrameSequenceIdxsR(iSeq,2) - validFrameSequenceIdxsR(iSeq,1) >= 24
+            [processedPanelOutput.DetectedFramesR, frameData] = FindMatchingFrames(processedPanelOutput.DetectedFramesR, processedPanelOutput.DetectedFlipsR, validFrameSequenceIdxsR(iSeq,:), frameData, 'FlashPanelRStatus');
+        else
+            disp('asdkghfkdgh')
+        end
     end
 
     [processedPanelOutput.DetectedFramesL] = AssignMatchedFramesToDetectedFramesLeft(processedPanelOutput);
@@ -150,7 +154,7 @@ end
 function [discFramesL] = AssignMatchedFramesToDetectedFramesLeft(processedPanelOutput)
     
     % Find the rows in the DetectedFramesR that have a matched Frame 
-    validRowsInDetectedFramesR = processedPanelOutput.DetectedFramesR(~isnan(processedPanelOutput.DetectedFramesR.UnityMatchedFrame), :);
+    validRowsInDetectedFramesR = processedPanelOutput.DetectedFramesR(~isnan(processedPanelOutput.DetectedFramesR.ReportedMatchedFrame), :);
     
     % Get a reference to the DetectedFramesL
     discFramesL = processedPanelOutput.DetectedFramesL;
@@ -162,7 +166,7 @@ function [discFramesL] = AssignMatchedFramesToDetectedFramesLeft(processedPanelO
         
         try
             % Find the corresponding Flip Index in flipDetailsL
-            flipIndexL = find(processedPanelOutput.flipDetailsL.CorrectedTime == processedPanelOutput.flipDetailsR.CorrectedTime(flipIndexR));
+            flipIndexL = find(processedPanelOutput.DetectedFlipsL.CorrectedTime == processedPanelOutput.DetectedFlipsR.CorrectedTime(flipIndexR));
         catch
         end
 
@@ -178,46 +182,46 @@ function [discFramesL] = AssignMatchedFramesToDetectedFramesLeft(processedPanelO
         iDiscFramesL = find(discFramesL.FlipIndex == flipIndexL);
         
         % Assign the UnityMatchedFrame value from DetectedFramesR to DetectedFramesL
-        discFramesL.UnityMatchedFrame(iDiscFramesL) = validRowsInDetectedFramesR.UnityMatchedFrame(iDiscFramesR);
+        discFramesL.ReportedMatchedFrame(iDiscFramesL) = validRowsInDetectedFramesR.ReportedMatchedFrame(iDiscFramesR);
     end
 end
 
 function [frameData] = AssignDiscretizedDataFieldsToFrameData(frameData, processedPanelOutput)
-    % Add a column with row indices to DetectedFramesR
-    processedPanelOutput.DetectedFramesR.RowIndices = (1:height(processedPanelOutput.DetectedFramesR))';
-
-    rowsWithAMatchedFrameR = ~isnan(processedPanelOutput.DetectedFramesR.UnityMatchedFrame);
-    discretizedDataWithAMatchedFrameR = processedPanelOutput.DetectedFramesR(rowsWithAMatchedFrameR, :);
-
-    rowsWithAMatchedFrameL = ~isnan(processedPanelOutput.DetectedFramesL.UnityMatchedFrame);
+    % % Add a column with row indices to DetectedFramesR
+    % processedPanelOutput.DetectedFramesR.RowIndices = (1:height(processedPanelOutput.DetectedFramesR))';
+    % 
+    % rowsWithAMatchedFrameR = ~isnan(processedPanelOutput.DetectedFramesR.UnityMatchedFrame);
+    % discretizedDataWithAMatchedFrameR = processedPanelOutput.DetectedFramesR(rowsWithAMatchedFrameR, :);
+    % 
+    rowsWithAMatchedFrameL = ~isnan(processedPanelOutput.DetectedFramesL.ReportedMatchedFrame);
     discretizedDataWithAMatchedFrameL = processedPanelOutput.DetectedFramesL(rowsWithAMatchedFrameL, :);
-
-    for iDiscRowR = 1:height(discretizedDataWithAMatchedFrameR)
-        frameVal = discretizedDataWithAMatchedFrameR.UnityMatchedFrame(iDiscRowR);
-        
-        % Find the corresponding row in frameData
-        matchingRow = frameData.Frame == frameVal;
-        
-        % Assign the original index to the frameData.DiscretizedFrameIndex
-        frameData.DiscretizedFrameIndex(matchingRow) = discretizedDataWithAMatchedFrameR.RowIndices(iDiscRowR);
-
-        % Assign FlipIndex to the frameData.DiscretizedFlipIndex 
-        frameData.DiscretizedFlipIndex(matchingRow) = discretizedDataWithAMatchedFrameR.FlipIndex(iDiscRowR);
-        
-        % Assign the value of whether or not the flashed pattern matched
-        % the expected pattern (Using the Right Panel)
-        frameData.FrameValidity(matchingRow) = processedPanelOutput.frameDetailsR.Validity(iDiscRowR);
-    end
+    % 
+    % for iDiscRowR = 1:height(discretizedDataWithAMatchedFrameR)
+    %     frameVal = discretizedDataWithAMatchedFrameR.UnityMatchedFrame(iDiscRowR);
+    % 
+    %     % Find the corresponding row in frameData
+    %     matchingRow = frameData.Frame == frameVal;
+    % 
+    %     % Assign the original index to the frameData.DiscretizedFrameIndex
+    %     frameData.DiscretizedFrameIndex(matchingRow) = discretizedDataWithAMatchedFrameR.RowIndices(iDiscRowR);
+    % 
+    %     % Assign FlipIndex to the frameData.DiscretizedFlipIndex 
+    %     frameData.DiscretizedFlipIndex(matchingRow) = discretizedDataWithAMatchedFrameR.FlipIndex(iDiscRowR);
+    % 
+    %     % Assign the value of whether or not the flashed pattern matched
+    %     % the expected pattern (Using the Right Panel)
+    %     frameData.FrameValidity(matchingRow) = processedPanelOutput.frameDetailsR.Validity(iDiscRowR);
+    % end
 
     for iDiscRowL = 1:height(discretizedDataWithAMatchedFrameL)
-        frameVal = discretizedDataWithAMatchedFrameL.UnityMatchedFrame(iDiscRowL);
+        frameVal = discretizedDataWithAMatchedFrameL.ReportedMatchedFrame(iDiscRowL);
         
         % Find the corresponding row in frameData
         matchingRow = frameData.Frame == frameVal;
         
         % Assign the Correct SynchBox Time to the
         % frameData.FrameOnsetSyncBoxTime (Using Left Panel)
-        frameData.FrameOnsetSyncBoxTime(matchingRow) = processedPanelOutput.flipDetailsL.CorrectedTime(discretizedDataWithAMatchedFrameL.FlipIndex(iDiscRowL));
+        frameData.FrameOnsetSyncBoxTime(matchingRow) = processedPanelOutput.DetectedFlipsL.CorrectedTime(discretizedDataWithAMatchedFrameL.FlipIndex(iDiscRowL));
     end
 end
 

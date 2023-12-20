@@ -10,7 +10,7 @@ function [frameData, timeDifferences] = VerifyEventCodeTiming(frameData, serialR
     for idx = 1:height(framesWithGivenEventCode)
         frame = framesWithGivenEventCode.Frame(idx);
         refCode = str2double(framesWithGivenEventCode.ReferenceEventCodes{idx});
-        detectedFrameOnset = framesWithGivenEventCode.DetectedFrameOnset(idx);
+        detectedFrameOnset = framesWithGivenEventCode.FrameOnsetSyncBoxTime(idx);
         % Find the first instance of the ref code in the
         % serialRecvData.EventCodes.CodeValue column where the
         % serialRecvData.EventCodes.CodeValue is >= frame
