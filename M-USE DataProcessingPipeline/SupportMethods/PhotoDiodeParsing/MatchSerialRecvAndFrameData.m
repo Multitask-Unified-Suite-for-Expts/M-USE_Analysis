@@ -4,12 +4,17 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
     processedPanelOutput.DetectedFramesL.UnityRecvFrame = processedPanelOutput.DetectedFlipsL.UnityRecvFrame(processedPanelOutput.DetectedFramesL.FlipIndex);
 
     
-    processedPanelOutput.DetectedFramesR.UnityMatchedFrame = nan(height(processedPanelOutput.DetectedFramesR),1);
-    processedPanelOutput.DetectedFramesL.UnityMatchedFrame = nan(height(processedPanelOutput.DetectedFramesL),1);
-    frameData.FrameValidity = nan(height(frameData), 1);    
+    processedPanelOutput.DetectedFramesR.ReportedMatchedFrame = nan(height(processedPanelOutput.DetectedFramesR),1);
+    processedPanelOutput.DetectedFramesL.ReportedMatchedFrame = nan(height(processedPanelOutput.DetectedFramesL),1);
+    % processedPanelOutput.DetectedFlipsR.ReportedMatchedOnsetFrame = nan(height(processedPanelOutput.DetectedFlipsR),1);
+    % processedPanelOutput.DetectedFlipsL.ReportedMatchedOnsetFrame = nan(height(processedPanelOutput.DetectedFlipsL),1);
+    % processedPanelOutput.DetectedFlipsR.DetectedMatchedOnsetFrame = nan(height(processedPanelOutput.DetectedFlipsR),1);
+    % processedPanelOutput.DetectedFlipsL.DetectedMatchedOnsetFrame = nan(height(processedPanelOutput.DetectedFlipsL),1);
+    frameData.FrameValidity = zeros(height(frameData), 1);    
     frameData.FrameOnsetSyncBoxTime = nan(height(frameData), 1);
-    frameData.DiscretizedFrameIndex = nan(height(frameData), 1);
+    frameData.DetectedFrameIndex = nan(height(frameData), 1);
     frameData.FlipIndex = nan(height(frameData), 1);
+
 
     
     %Remove the rows that are showing duplicates
@@ -20,7 +25,7 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
 
     validFrameSequenceIdxsR = FindValidFrameSequences(processedPanelOutput.DetectedFramesR, 1);
     for iSeq = 1:size(validFrameSequenceIdxsR,1)
-        [processedPanelOutput.DetectedFramesR] = FindMatchingFrames(processedPanelOutput.DetectedFramesR, processedPanelOutput.DetectedFlipsR, validFrameSequenceIdxsR(iSeq,:), frameData, 'FlashPanelRStatus');
+        [processedPanelOutput.DetectedFramesR, frameData] = FindMatchingFrames(processedPanelOutput.DetectedFramesR, processedPanelOutput.DetectedFlipsR, validFrameSequenceIdxsR(iSeq,:), frameData, 'FlashPanelRStatus');
     end
 
     [processedPanelOutput.DetectedFramesL] = AssignMatchedFramesToDetectedFramesLeft(processedPanelOutput);
@@ -28,7 +33,7 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
     fred = 2;
 end
 
-function [detectedFrames] = FindMatchingFrames(detectedFrames, detectedFlips, detectedFrameBoundaries, unityReportedFrameData, frameStatusCol)
+function [detectedFrames, unityReportedFrameData] = FindMatchingFrames(detectedFrames, detectedFlips, detectedFrameBoundaries, unityReportedFrameData, frameStatusCol)
 
 
     %find the frames in unityReportedFrameData that corresponed to the sequence in
@@ -41,8 +46,14 @@ function [detectedFrames] = FindMatchingFrames(detectedFrames, detectedFlips, de
 
 
     %flipDetails contains frames in which unity received syncbox data
-    detectedFlipSubset = detectedFlips(max(detectedFrameSubset.FlipIndex(1) - pad, 1) : min(detectedFrameSubset.FlipIndex(end) + pad, end),:);
-    reportedFrameSubset = unityReportedFrameData(unityReportedFrameData.Frame >= detectedFlipSubset.UnityRecvFrame(1) & unityReportedFrameData.Frame < detectedFlipSubset.UnityRecvFrame(end),:);
+    flipSubsetIdxs = max(detectedFrameSubset.FlipIndex(1) - pad, 1) : min(detectedFrameSubset.FlipIndex(end) + pad, height(detectedFlips));
+    try
+        detectedFlipSubset = detectedFlips(flipSubsetIdxs,:);
+    catch
+        fred = 2;
+    end
+    reportedFrameSubsetIdxs = find(unityReportedFrameData.Frame >= detectedFlipSubset.UnityRecvFrame(1) & unityReportedFrameData.Frame < detectedFlipSubset.UnityRecvFrame(end));
+    reportedFrameSubset = unityReportedFrameData(reportedFrameSubsetIdxs,:);
 
     reportedFrameStatus = reportedFrameSubset.(frameStatusCol);
     detectedFrameStatus = detectedFrameSubset.Status;
@@ -59,7 +70,12 @@ function [detectedFrames] = FindMatchingFrames(detectedFrames, detectedFlips, de
 
     if ~isempty(matchPoints)
         matchPoint = max(matchPoints); %get the closest point to the received frame
-        
+        reportedMatchIdxs = reportedFrameSubsetIdxs(1) + matchPoint - 1 : reportedFrameSubsetIdxs(1) + matchPoint - 1 + height(detectedFrameSubset) - 1;
+        unityReportedFrameData.FrameValidity(reportedMatchIdxs) = 1;
+        unityReportedFrameData.DetectedFrameIndex(reportedMatchIdxs) = detectedFrameBoundaries(1):detectedFrameBoundaries(2);
+        unityReportedFrameData.FlipIndex(reportedMatchIdxs) = detectedFrameSubset.FlipIndex;
+        detectedFrames.ReportedMatchedFrame(detectedFrameBoundaries(1):detectedFrameBoundaries(2)) = unityReportedFrameData.Frame(reportedMatchIdxs);
+        detectedFlipMatchIdxs = flipSubsetIdxs(1) + matchPoint - 1 : flipSubsetIdxs(1) + matchPoint - 1 + height(detectedFrameSubset) - 1;
     else
         disp("OH NO!!!!");
     end
