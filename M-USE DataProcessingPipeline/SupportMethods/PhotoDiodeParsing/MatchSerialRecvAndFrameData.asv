@@ -6,7 +6,7 @@ function [matchedFrameData, processedPanelOutput] = MatchSerialRecvAndFrameData(
     
     processedPanelOutput.DetectedFramesR.UnityMatchedFrame = nan(height(processedPanelOutput.DetectedFramesR),1);
     processedPanelOutput.DetectedFramesL.UnityMatchedFrame = nan(height(processedPanelOutput.DetectedFramesL),1);
-    frameData.FrameValidity = nan(height(frameData), 1);    
+    frameData.FrameValidity = zeros(height(frameData), 1);    
     frameData.FrameOnsetSyncBoxTime = nan(height(frameData), 1);
     frameData.DiscretizedFrameIndex = nan(height(frameData), 1);
     frameData.FlipIndex = nan(height(frameData), 1);
