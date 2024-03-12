@@ -69,9 +69,10 @@ function Import_MUSE_Session_RawData(varargin)
         currentTaskSelectionDataPath = taskSelectionRunTimeDataPaths{i};
         currentTaskSelectionProcessedDataPath = taskSelectionProcessedDataPaths{i};
 
-         processTaskSelectionDataTypes(currentTaskSelectionDataPath, currentTaskSelectionFolderName, forceProcessAllData,  currentTaskSelectionProcessedDataPath, ...
-            subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, ...
-            gazeArgs, ignoreBlockCondition);
+        % UNCOMMENT THE LINE BELOW TO PROCESS TASK SELECTION DATA
+         % processTaskSelectionDataTypes(currentTaskSelectionDataPath, currentTaskSelectionFolderName, forceProcessAllData,  currentTaskSelectionProcessedDataPath, ...
+            % subjectNum, sessionNum, deleteAbortedTrials, nanAbortedTrials, exptType, ...
+            % gazeArgs, ignoreBlockCondition);
     end
 
     % Begin processing the data for each of the folders in task selection
@@ -143,7 +144,7 @@ function processAllDataTypes(runtimeDataPath, currentTaskName, forceProcessAllDa
     processSerialData(runtimeDataPath, forceProcessAllData, currentProcessedDataPath, subjectNum, sessionNum);
     
     % Process flash panel data
-    [ frameDetailsL, exceptionDetailsL, frameDetailsR, exceptionDetailsR, orderedMatrices, frameCounts] = HandleFrameDetails(serialRecvData, frameData);
+    %[ frameDetailsL, exceptionDetailsL, frameDetailsR, exceptionDetailsR, orderedMatrices, frameCounts] = HandleFrameDetails(serialRecvData, frameData);
 
 end
 

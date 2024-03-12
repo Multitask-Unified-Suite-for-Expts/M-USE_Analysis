@@ -131,15 +131,16 @@ while ~concatenated
                 if length(quotes) == 2
                     problemVar = ME.message(quotes(1)+1 : quotes(2)-1);
                     
-                    if find(ismember({'TrialInBlock', 'TrialInExperiment'}, problemVar))
+                    if find(ismember({'TrialInBlock', 'TrialInExperiment', 'TrialCount_InBlock', 'TrialCount_InTask'}, problemVar))
                         dataCell = ForceDouble(dataCell, problemVar);
                     %elseif find(ismember({'TouchedObjectID', 'TouchedObjectId', 'SimpleTouchTarget', 'ShotgunTouchHits', 'ModalShotgunTouchHit', 'PreSplitEventCodes', 'SimpleGazeTarget', 'ShotgunGazeHits', 'ModalShotgunGazeHit', 'HaloType', 'TokenAnimationPhase', 'EventCodes', 'SliderAnimationPhase'}, problemVar))
                     % extended with 'SelectedObject'
-                    elseif find(ismember({'TouchedObjectID', 'TouchedObjectId', 'SimpleTouchTarget', 'ShotgunTouchHits', 'ModalShotgunTouchHit', 'PreSplitEventCodes', 'SimpleGazeTarget', 'ShotgunGazeHits', 'ModalShotgunGazeHit', 'HaloType', 'TokenAnimationPhase', 'EventCodes', 'SliderAnimationPhase','SelectedObject', 'ReferenceEventCodes', 'FrameEventCodes', 'SplitEventCodes'}, problemVar))
+                    elseif find(ismember({'TouchedObjectID', 'TouchedObjectId', 'SimpleTouchTarget', 'ShotgunTouchHits', 'ModalShotgunTouchHit', 'PreSplitEventCodes', 'SimpleGazeTarget', 'ShotgunGazeHits', 'ModalShotgunGazeHit', 'HaloType', 'TokenAnimationPhase', 'EventCodes', 'SliderAnimationPhase','SelectedObject'}, problemVar))
                         dataCell = ForceCell(dataCell, problemVar);
+
                     else
                         disp(['Concatenation problem with variable ' problemVar]);
-                    % keyboard
+                      keyboard
                     end
                 end
             otherwise

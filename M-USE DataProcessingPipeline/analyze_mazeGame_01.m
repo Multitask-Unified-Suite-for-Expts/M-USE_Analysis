@@ -26,16 +26,18 @@
 do_LoadData = 0;
 do_AnalysisBasic = 1;
 do_AnalysisBasicPlot = 1;
-do_AcrossSessionAnalysis = 0;
+do_AcrossSessionAnalysis_SortedByMazeType = 0;
+do_AcrossSessionAnalysis_SortedBySession = 0;
 do_WithinSessionAnalysis = 1;
 
 DO_SAVEFIGURES = 1;
-PLOT_ACROSSSESSIONS = 0;
+PLOT_ACROSSSESSIONS_SortedByMazeType = 0;
+PLOT_ACROSSSESSIONS_SortedBySession = 0;
 PLOT_INDIVIDUALSESSIONS = 1;
 % --- --- --- --- --- --- --- ---
 % --- folder with preprocecced data
 % --- --- --- --- --- --- --- ---
-HOME_FOLDER = ['C:\Users\WomLab_Unity\OneDrive\Documents\GitHub' filesep];
+HOME_FOLDER = ['/Users/seema/Desktop/m-use/M-USE_Analysis' filesep];
 %'/Users/thiwom/Main/projects/201912_P_KioskFluBehavior/M_USE/GAMES_MATLAB_ANALYSIS'
 MUSEMATFOLDERNames = {}; iResultFolder = ''; iResultFile = '';
 
@@ -225,7 +227,7 @@ if do_AnalysisBasic == 1
         load(fullfile(RESULTFOLDER, iResultFile))
     end
 
-    if do_AcrossSessionAnalysis == 1
+    if do_AcrossSessionAnalysis_SortedByMazeType == 1
         % Identify unique mazes by turns and length
         mazeTurnLength = vertcat(res.mazeTurnsLength);
         uniqueMazes = unique(mazeTurnLength, 'rows');
@@ -309,6 +311,40 @@ if do_AnalysisBasic == 1
 
 
     end
+    if do_AcrossSessionAnalysis_SortedBySession == 1
+        % Initialize structures to store the aggregated metrics
+        metrics_mz1 = struct('normalizedDurations', {}, 'normalizedTotalErrors', {}, 'normalizedRuleAbidingErrors', {}, 'normalizedRuleBreakingErrors', {}, 'normalizedPerseverationErrors', {});
+        metrics_mz1Repeat = struct('normalizedDurations', {}, 'normalizedTotalErrors', {}, 'normalizedRuleAbidingErrors', {}, 'normalizedRuleBreakingErrors', {}, 'normalizedPerseverationErrors', {});
+
+        for i = 1:length(res)
+            if isfield(res(i).data, 'Maze1')
+                pathLengthMaze1 = res(i).data.Maze1.mazeTurnsLength(:,2)';
+                metrics_mz1(i).normalizedDurations = mean((res(i).data.Maze1.mazeDuration ./ pathLengthMaze1), 'omitnan');
+                metrics_mz1(i).normalizedTotalErrors = mean((res(i).data.Maze1.totalErrors ./ pathLengthMaze1), 'omitnan');
+                metrics_mz1(i).normalizedRuleAbidingErrors = mean((res(i).data.Maze1.ruleAbidingErrors ./ pathLengthMaze1), 'omitnan');
+                metrics_mz1(i).normalizedRuleBreakingErrors = mean((res(i).data.Maze1.ruleBreakingErrors ./ pathLengthMaze1), 'omitnan');
+
+                sumOfPerseverativeErrors = res(i).data.Maze1.perseverativeRuleBreakingErrors + ...
+                    res(i).data.Maze1.perseverativeRuleAbidingErrors + ...
+                    res(i).data.Maze1.perseverativeRetouchErroneous;
+                metrics_mz1(i).normalizedPerseverationErrors = mean((sumOfPerseverativeErrors ./ pathLengthMaze1), 'omitnan');
+            end
+
+            if isfield(res(i).data, 'Maze1Repeat')
+                pathLengthMaze1Repeat = res(i).data.Maze1Repeat.mazeTurnsLength(:,2)';
+                metrics_mz1Repeat(i).normalizedDurations = mean((res(i).data.Maze1Repeat.mazeDuration ./ pathLengthMaze1Repeat), 'omitnan');
+                metrics_mz1Repeat(i).normalizedTotalErrors = mean((res(i).data.Maze1Repeat.totalErrors ./ pathLengthMaze1Repeat), 'omitnan');
+                metrics_mz1Repeat(i).normalizedRuleAbidingErrors = mean((res(i).data.Maze1Repeat.ruleAbidingErrors ./ pathLengthMaze1Repeat), 'omitnan');
+                metrics_mz1Repeat(i).normalizedRuleBreakingErrors = mean((res(i).data.Maze1Repeat.ruleBreakingErrors ./ pathLengthMaze1Repeat), 'omitnan');
+
+                sumOfPerseverativeErrors = res(i).data.Maze1Repeat.perseverativeRuleBreakingErrors + ...
+                    res(i).data.Maze1Repeat.perseverativeRuleAbidingErrors + ...
+                    res(i).data.Maze1Repeat.perseverativeRetouchErroneous;
+                metrics_mz1Repeat(i).normalizedPerseverationErrors = mean((sumOfPerseverativeErrors ./ pathLengthMaze1Repeat), 'omitnan');
+            end
+        end
+    end
+
     if do_WithinSessionAnalysis == 1
         % Initialize metrics structure
         metrics_mz1 = res(6).data.Maze1;
@@ -335,7 +371,7 @@ if do_AnalysisBasicPlot == 1
     %  --- --- --- --- --- --- ---
 
 
-    if PLOT_ACROSSSESSIONS==1
+    if PLOT_ACROSSSESSIONS_SortedByMazeType==1
 
         iSubject = metrics_mz.subjectName;
         metrics_mz.numTurnsTiles
@@ -448,6 +484,92 @@ if do_AnalysisBasicPlot == 1
         hold off;
     end
 
+   if PLOT_ACROSSSESSIONS_SortedBySession == 1
+    % Extract session dates from dataset names
+    sessionDates = cellfun(@(x) regexp(x, 'Session_(\d+_\d+)', 'tokens'), {res.dataset}, 'UniformOutput', false);
+    sessionDates = cellfun(@(x) x{1}{1}, sessionDates, 'UniformOutput', false); % Convert tokens to strings
+    sessionDatesFormatted = datetime(sessionDates, 'InputFormat', 'MM_dd', 'Format', 'MM/dd'); % Convert to datetime
+
+    % Initialize arrays to hold the means for plotting
+    normalizedDurationsMean = [];
+    normalizedTotalErrorsMean = [];
+    normalizedRuleAbidingErrorsMean = [];
+    normalizedRuleBreakingErrorsMean = [];
+
+    % Collect the means from the metrics_mz1 and metrics_mz1Repeat structures
+    for i = 1:length(metrics_mz1)
+        normalizedDurationsMean = [normalizedDurationsMean; metrics_mz1(i).normalizedDurations, metrics_mz1Repeat(i).normalizedDurations];
+        normalizedTotalErrorsMean = [normalizedTotalErrorsMean; metrics_mz1(i).normalizedTotalErrors, metrics_mz1Repeat(i).normalizedTotalErrors];
+        normalizedRuleAbidingErrorsMean = [normalizedRuleAbidingErrorsMean; metrics_mz1(i).normalizedRuleAbidingErrors, metrics_mz1Repeat(i).normalizedRuleAbidingErrors];
+        normalizedRuleBreakingErrorsMean = [normalizedRuleBreakingErrorsMean; metrics_mz1(i).normalizedRuleBreakingErrors, metrics_mz1Repeat(i).normalizedRuleBreakingErrors];
+    end
+
+    % Create a figure for the plots
+    figure;
+
+    % Specify dates for vertical lines
+    specificDates = ["02/12", "02/19", "02/26", "03/04"];
+    year = 2024; % Assuming the year is 2024, adjust accordingly
+    datesForLines = datetime(specificDates + "/" + num2str(year), 'InputFormat', 'MM/dd/yyyy');
+
+    % Loop through each subplot to plot data
+    for plotIndex = 1:4
+        subplot(2, 2, plotIndex);
+        hold on;
+
+        % Select the appropriate dataset for each subplot
+        switch plotIndex
+            case 1
+                dataToPlot = normalizedDurationsMean;
+                plotTitle = 'Normalized Durations Mean';
+            case 2
+                dataToPlot = normalizedTotalErrorsMean;
+                plotTitle = 'Normalized Total Errors Mean';
+            case 3
+                dataToPlot = normalizedRuleAbidingErrorsMean;
+                plotTitle = 'Normalized Rule Abiding Errors Mean';
+            case 4
+                dataToPlot = normalizedRuleBreakingErrorsMean;
+                plotTitle = 'Normalized Rule Breaking Errors Mean';
+        end
+
+        % Plot lines and scatter for the selected dataset
+        for seriesIndex = 1:size(dataToPlot, 2)
+            if seriesIndex == 1
+                displayName = 'Maze1';
+            else
+                displayName = 'Maze1Repeat';
+            end
+            plot(sessionDatesFormatted, dataToPlot(:, seriesIndex), 'LineWidth', 1.5, 'DisplayName', displayName);
+            scatter(sessionDatesFormatted, dataToPlot(:, seriesIndex), 'filled', 'HandleVisibility', 'off');
+        end
+
+        % Draw vertical lines at specific dates
+        for xValue = datesForLines
+            xline(xValue, '--k', 'LineWidth', 1, 'HandleVisibility', 'off');
+        end
+
+        title(plotTitle);
+        xlabel('Session Date');
+        ylabel('Value');
+        xticks(sessionDatesFormatted);  % Set x-axis ticks at each date
+        xtickformat('MM/dd');  % Format the tick labels
+        xtickangle(45);  % Rotate labels for readability
+        xlim([min(sessionDatesFormatted) max(sessionDatesFormatted)]);  % Adjust x-axis limits
+
+        % Add legend in the first plot only
+        if plotIndex == 1
+            legend('Location', 'best');
+        end
+
+        hold off;
+    end
+
+    % Adjust figure size and display
+    set(gcf, 'Position', [100, 100, 1200, 800]); % Adjust size as needed
+end
+
+
     if(PLOT_INDIVIDUALSESSIONS)
         % Prepare a single figure with two subplots
         figure;
@@ -475,6 +597,7 @@ if do_AnalysisBasicPlot == 1
             if ~isempty(matchingBlockIndex)
                 blockIndicesRepeat = find(blockNumsRepeat == blockNumsRepeat(matchingBlockIndex));
 
+                nTiles = metrics_mz1.mazeTurnsLength(blockIndicesInitial(1), 2);  % Assuming consistent maze length
                 [sortedTrialsInitial, sortIndexInitial] = sort(trialInBlockInitial(blockIndicesInitial));
                 [sortedTrialsRepeat, sortIndexRepeat] = sort(trialInBlockRepeat(blockIndicesRepeat));
 
@@ -493,9 +616,9 @@ if do_AnalysisBasicPlot == 1
                 hLine2 = plot(sortedTrialsRepeat, normalizedErrorsRepeat, '--', 'Color', colors(i,:), 'LineWidth', 1.5);
 
                 % Add line handles and their descriptions to arrays for the legend
-            hLines = [hLines, hLine1, hLine2];
-            legendEntries{end+1} = ['Block ' num2str(i) ' Initial'];
-            legendEntries{end+1} = ['Block ' num2str(i) ' Repeat'];
+                hLines = [hLines, hLine1, hLine2];
+                legendEntries{end+1} = ['Block ' num2str(i) ' Initial'];
+                legendEntries{end+1} = ['Block ' num2str(i) ' Repeat'];
 
 
                 % Second subplot for normalized maze durations
