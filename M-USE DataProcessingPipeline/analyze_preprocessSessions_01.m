@@ -25,7 +25,7 @@
 % ---
 
 % SessionSets = {'Frey-1' };
-% SessionSets = {'Frey-2' }; ok, finished - last run Jan 29
+  %SessionSets = {'Frey-2' }; % ok, finished - last run Jan 29
 % SessionSets = {'Frey-3' }; % new since jan 2024 - last run Jan 29
 
 % SessionSets = {'Wotan-1' };
@@ -76,7 +76,7 @@ elseif strcmp(SessionSets{iO},'Frey-3')
         % FOLDER_SESSION{iSession}  = 'Session_08_17_23__09_53_45_Wotan'; % new FL blocksequence (60% EDsame/IDsame) blocks
     elseif strcmp(SessionSets{iO},'Wotan-2')
         Subject = 'Wotan';
-        FOLDER_DATA = 'Z:\DATA_kiosk\Wotan\WM_EC_FL_MZG';
+        FOLDER_DATA = '/Volumes/Womelsdorf Lab/DATA_kiosk/Wotan/WM_EC_FL_MZG';
         EXP_ID = 'WM_EC_FL_MZG';
         RESULT_FOLDER = [pwd filesep 'MUSEMAT01_WM_EC_FL_MZG_Wotan']; if ~exist(RESULT_FOLDER), mkdir(RESULT_FOLDER), end
         % FOLDER_DATA = /Volumes/'Womelsdorf Lab'/DATA_kiosk/Wotan/WM_EC_FL_MZG/
@@ -137,7 +137,7 @@ elseif strcmp(SessionSets{iO},'Frey-3')
     % --- --- --- --- --- --- ---
     % --- determine which sessions to analyze
     % --- --- --- --- --- --- ---
-    for iSession = 56:73 % EDITED FOR SESSION FROM 2/8 TO 3/4
+    for iSession = 56:85 % EDITED FOR SESSION FROM 2/8 TO 3/21
         iSessionName = FOLDER_SESSION{iSession};
         iSessionDataFolder = [ FOLDER_DATA  filesep  iSessionName ];
         iResultFile = ['DAT01_' Subject '_' EXP_ID '_' iSessionName];
