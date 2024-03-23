@@ -23,17 +23,17 @@
 %    at http://www.gnu.org/licenses/
 
 
-do_LoadData = 1;
+do_LoadData = 0;
 do_AnalysisBasic = 1;
 do_AnalysisBasicPlot = 1;
 do_AcrossSessionAnalysis_SortedByMazeType = 0;
-do_AcrossSessionAnalysis_SortedBySession = 0;
-do_WithinSessionAnalysis = 1;
+do_AcrossSessionAnalysis_SortedBySession = 1;
+do_WithinSessionAnalysis = 0;
 
 DO_SAVEFIGURES = 0;
 PLOT_ACROSSSESSIONS_SortedByMazeType = 0;
-PLOT_ACROSSSESSIONS_SortedBySession = 0;
-PLOT_INDIVIDUALSESSIONS = 1;
+PLOT_ACROSSSESSIONS_SortedBySession = 1;
+PLOT_INDIVIDUALSESSIONS = 0;
 % --- --- --- --- --- --- --- ---
 % --- folder with preprocecced data
 % --- --- --- --- --- --- --- ---
@@ -42,8 +42,8 @@ HOME_FOLDER = ['C:\Users\Sorti\OneDrive\Documents\GitHub\M-USE_Analysis\M-USE Da
 MUSEMATFOLDERNames = {}; iResultFolder = ''; iResultFile = '';
 
 
-SessionID_MZ = {'Frey_MZ_all_01'};
-% SessionID_MZ = {'Wotan_MZ_all_01'};
+%SessionID_MZ = {'Frey_MZ_all_01'};
+SessionID_MZ = {'Wotan_MZ_all_01'};
 
 % MUSEMATFOLDERNames = 'MUSEMAT01_VS_EC_FL_MZG_Frey'
 switch SessionID_MZ{1}
@@ -51,7 +51,7 @@ switch SessionID_MZ{1}
         MUSEMATFOLDERNames{1} = 'MUSEMAT01_WM_EC_FL_MZG_Frey'
         % MUSEMATFOLDERNames{2} = 'MUSEMAT01_VS_EC_FL_MRT_Frey'
         iResultFolder = [MUSEMATFOLDERNames{1} '_RES'];
-        iResultFile   = 'MZ_Frey_01_20240322'; %'WM_01_20231205';%'WM_01_20230907';
+        iResultFile   = 'MZ_Frey_01_20240319'; %'WM_01_20231205';%'WM_01_20230907';
     case {'Wotan_MZ_all_01'}
         MUSEMATFOLDERNames{1} =  'MUSEMAT01_WM_EC_FL_MZG_Wotan';
         %MUSEMATFOLDERNames{2} =  'MUSEMAT01_VS_EC_FL_MRT_Wotan';
@@ -160,12 +160,10 @@ if do_LoadData == 1
                     blockDef = table2struct(in.dat.cfg_BlockDef{idx});
                     iT = 0;
                     for jj = 1:length(trialData)
-                        if trialData(jj).AbortCode ~= 0
-                            continue; % Skip to the next iteration of the loop
-                        end
                         % Assign trial data, block data, and block definitions
                         currentData = res(iD).data.(strrep(label{1}, '_', ''));
-
+                        
+                        if (currentData.)
                         iT = iT + 1;
                         currentData.subjectName{iT} = trialData(jj).SubjectID;%  trialData(iT).SubjectNum;
 
@@ -269,7 +267,7 @@ if do_AnalysisBasic == 1
             totalErrorsFirst = [];
             totalErrorsRepeat = [];
             % Similar variables for other metrics...
-
+            
             for iD = 1:length(res)
                 % Handle Maze1
                 if isfield(res(iD).data, 'Maze1')
@@ -343,8 +341,8 @@ if do_AnalysisBasic == 1
 
     if do_WithinSessionAnalysis == 1
         % Initialize metrics structure
-        metrics_mz1 = res(13).data.Maze1;
-        metrics_mz1Repeat = res(13).data.Maze1Repeat;
+        metrics_mz1 = res(6).data.Maze1;
+        metrics_mz1Repeat = res(6).data.Maze1Repeat;
     end
 end
 
@@ -482,87 +480,87 @@ if do_AnalysisBasicPlot == 1
     end
 
 
-    if PLOT_ACROSSSESSIONS_SortedBySession == 1
-        % Extract session dates from dataset names
-        sessionDates = cellfun(@(x) regexp(x, 'Session_(\d+_\d+)', 'tokens'), {res.dataset}, 'UniformOutput', false);
-        sessionDates = cellfun(@(x) x{1}{1}, sessionDates, 'UniformOutput', false); % Convert tokens to strings
-        sessionDatesFormatted = datetime(sessionDates, 'InputFormat', 'MM_dd', 'Format', 'MM/dd'); % Convert to datetime
+  if PLOT_ACROSSSESSIONS_SortedBySession == 1
+    % Extract session dates from dataset names
+    sessionDates = cellfun(@(x) regexp(x, 'Session_(\d+_\d+)', 'tokens'), {res.dataset}, 'UniformOutput', false);
+    sessionDates = cellfun(@(x) x{1}{1}, sessionDates, 'UniformOutput', false); % Convert tokens to strings
+    sessionDatesFormatted = datetime(sessionDates, 'InputFormat', 'MM_dd', 'Format', 'MM/dd'); % Convert to datetime
 
-        % Initialize arrays to hold the means for plotting
-        normalizedDurationsDiff = [];
-        normalizedTotalErrorsDiff = [];
-        normalizedRuleAbidingErrorsDiff = [];
-        normalizedRuleBreakingErrorsDiff = [];
-        normalizedPerseverationErrorsDiff = [];
+    % Initialize arrays to hold the means for plotting
+    normalizedDurationsDiff = [];
+    normalizedTotalErrorsDiff = [];
+    normalizedRuleAbidingErrorsDiff = [];
+    normalizedRuleBreakingErrorsDiff = [];
+    normalizedPerseverationErrorsDiff = [];
 
 
-        % Calculate the difference between the metrics for Maze1Repeat and Maze1
-        for i = 1:length(metrics_mz1)
-            normalizedDurationsDiff = [normalizedDurationsDiff; metrics_mz1Repeat(i).meanNormalizedDurations - metrics_mz1(i).meanNormalizedDurations];
-            normalizedTotalErrorsDiff = [normalizedTotalErrorsDiff; metrics_mz1Repeat(i).meanNormalizedTotalErrors - metrics_mz1(i).meanNormalizedTotalErrors];
-            normalizedRuleAbidingErrorsDiff = [normalizedRuleAbidingErrorsDiff; metrics_mz1Repeat(i).meanNormalizedRuleAbidingErrors - metrics_mz1(i).meanNormalizedRuleAbidingErrors];
-            normalizedRuleBreakingErrorsDiff = [normalizedRuleBreakingErrorsDiff; metrics_mz1Repeat(i).meanNormalizedRuleBreakingErrors - metrics_mz1(i).meanNormalizedRuleBreakingErrors];
-            normalizedPerseverationErrorsDiff = [normalizedPerseverationErrorsDiff; metrics_mz1Repeat(i).meanNormalizedPerseverationErrors - metrics_mz1(i).meanNormalizedPerseverationErrors];
+    % Calculate the difference between the metrics for Maze1Repeat and Maze1
+    for i = 1:length(metrics_mz1)
+        normalizedDurationsDiff = [normalizedDurationsDiff; metrics_mz1Repeat(i).meanNormalizedDurations - metrics_mz1(i).meanNormalizedDurations];
+        normalizedTotalErrorsDiff = [normalizedTotalErrorsDiff; metrics_mz1Repeat(i).meanNormalizedTotalErrors - metrics_mz1(i).meanNormalizedTotalErrors];
+        normalizedRuleAbidingErrorsDiff = [normalizedRuleAbidingErrorsDiff; metrics_mz1Repeat(i).meanNormalizedRuleAbidingErrors - metrics_mz1(i).meanNormalizedRuleAbidingErrors];
+        normalizedRuleBreakingErrorsDiff = [normalizedRuleBreakingErrorsDiff; metrics_mz1Repeat(i).meanNormalizedRuleBreakingErrors - metrics_mz1(i).meanNormalizedRuleBreakingErrors];
+        normalizedPerseverationErrorsDiff = [normalizedPerseverationErrorsDiff; metrics_mz1Repeat(i).meanNormalizedPerseverationErrors - metrics_mz1(i).meanNormalizedPerseverationErrors];
 
-        end
-
-        % Create a figure for the plots
-        figure;
-
-        % Specify dates for vertical lines
-        specificDates = ["02/12", "02/19", "02/26", "03/04", "03/11", "03/18"];
-        year = 2024; % Assuming the year is 2024, adjust accordingly
-        datesForLines = datetime(specificDates + "/" + num2str(year), 'InputFormat', 'MM/dd/yyyy');
-
-        % Titles for each subplot
-        plotTitles = {'Normalized Durations Difference', 'Normalized Total Errors Difference', 'Normalized Rule Abiding Errors Difference', 'Normalized Rule Breaking Errors Difference', 'Normalized Perseveration Errors Difference'};
-
-        % Loop through each subplot to plot data
-        for plotIndex = 1:5
-            subplot(3, 2, plotIndex);
-            hold on;
-
-            % Select the appropriate dataset for each subplot
-            switch plotIndex
-                case 1
-                    dataToPlot = normalizedDurationsDiff;
-                case 2
-                    dataToPlot = normalizedTotalErrorsDiff;
-                case 3
-                    dataToPlot = normalizedRuleAbidingErrorsDiff;
-                case 4
-                    dataToPlot = normalizedRuleBreakingErrorsDiff;
-                case 5
-                    dataToPlot = normalizedPerseverationErrorsDiff;
-            end
-
-            % Plot lines and scatter for the selected dataset
-            plot(sessionDatesFormatted, dataToPlot, 'LineWidth', 1.5, 'DisplayName', 'Repeat - Initial');
-            scatter(sessionDatesFormatted, dataToPlot, 'filled', 'HandleVisibility', 'off');
-
-            % Draw vertical lines at specific dates
-            for xValue = datesForLines
-                xline(xValue, '--k', 'LineWidth', 1, 'HandleVisibility', 'off');
-            end
-            yline(0, 'r', 'LineWidth', 1, 'HandleVisibility', 'off');
-
-            title(plotTitles{plotIndex});
-            xlabel('Session Date');
-            ylabel('Difference');
-            xticks(sessionDatesFormatted);  % Set x-axis ticks at each date
-            xtickformat('MM/dd');  % Format the tick labels
-            xtickangle(60);  % Rotate labels for readability
-            xlim([min(sessionDatesFormatted) max(sessionDatesFormatted)]);  % Adjust x-axis limits
-
-            hold off;
-        end
-
-        % Adjust figure size and display
-        set(gcf, 'Position', [50, 50, 1800, 1800]); % Adjust size as needed
-
-        % Add legend in the last plot
-        legend('Location', 'best');
     end
+
+    % Create a figure for the plots
+    figure;
+
+    % Specify dates for vertical lines
+    specificDates = ["02/12", "02/19", "02/26", "03/04", "03/11", "03/18"];
+    year = 2024; % Assuming the year is 2024, adjust accordingly
+    datesForLines = datetime(specificDates + "/" + num2str(year), 'InputFormat', 'MM/dd/yyyy');
+
+    % Titles for each subplot
+    plotTitles = {'Normalized Durations Difference', 'Normalized Total Errors Difference', 'Normalized Rule Abiding Errors Difference', 'Normalized Rule Breaking Errors Difference', 'Normalized Perseveration Errors Difference'};
+
+    % Loop through each subplot to plot data
+    for plotIndex = 1:5
+        subplot(3, 2, plotIndex);
+        hold on;
+
+        % Select the appropriate dataset for each subplot
+        switch plotIndex
+            case 1
+                dataToPlot = normalizedDurationsDiff;
+            case 2
+                dataToPlot = normalizedTotalErrorsDiff;
+            case 3
+                dataToPlot = normalizedRuleAbidingErrorsDiff;
+            case 4
+                dataToPlot = normalizedRuleBreakingErrorsDiff;
+            case 5
+                dataToPlot = normalizedPerseverationErrorsDiff;
+        end
+
+        % Plot lines and scatter for the selected dataset
+        plot(sessionDatesFormatted, dataToPlot, 'LineWidth', 1.5, 'DisplayName', 'Repeat - Initial');
+        scatter(sessionDatesFormatted, dataToPlot, 'filled', 'HandleVisibility', 'off');
+
+        % Draw vertical lines at specific dates
+        for xValue = datesForLines
+            xline(xValue, '--k', 'LineWidth', 1, 'HandleVisibility', 'off');
+        end
+        yline(0, 'r', 'LineWidth', 1, 'HandleVisibility', 'off');
+
+        title(plotTitles{plotIndex});
+        xlabel('Session Date');
+        ylabel('Difference');
+        xticks(sessionDatesFormatted);  % Set x-axis ticks at each date
+        xtickformat('MM/dd');  % Format the tick labels
+        xtickangle(60);  % Rotate labels for readability
+        xlim([min(sessionDatesFormatted) max(sessionDatesFormatted)]);  % Adjust x-axis limits
+        
+        hold off;
+    end
+
+    % Adjust figure size and display
+    set(gcf, 'Position', [50, 50, 1800, 1800]); % Adjust size as needed
+
+    % Add legend in the last plot
+    legend('Location', 'best');
+end
 
 
     if(PLOT_INDIVIDUALSESSIONS)
