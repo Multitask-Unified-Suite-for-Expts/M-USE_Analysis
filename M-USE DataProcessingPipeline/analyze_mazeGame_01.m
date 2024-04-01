@@ -28,12 +28,22 @@ do_AnalysisBasic = 1;
 do_AnalysisBasicPlot = 1;
 do_AcrossSessionAnalysis_SortedByMazeType = 0;
 do_AcrossSessionAnalysis_SortedBySession = 0;
-do_WithinSessionAnalysis = 1;
+do_AcrossSessionAnalysis_SortedByWeekday = 0;
+do_AcrossSessionAnalysis_LearningCurve = 1;
+do_AcrossSessionAnalysis_LearningCurve_ErrorRateDifferences = 0;
+
+
+do_WithinSessionAnalysis = 0; % NEEDS TO BE UPDATED
 
 DO_SAVEFIGURES = 0;
-PLOT_ACROSSSESSIONS_SortedByMazeType = 0;
-PLOT_ACROSSSESSIONS_SortedBySession = 0;
-PLOT_INDIVIDUALSESSIONS = 1;
+
+PLOT_INDIVIDUALSESSIONS = 0;
+
+MIN_TURNS = 4; % SET TO 0 TO IGNORE TRIAL DATA FILTERING
+MIN_LENGTH = 14;
+MAX_TURNS = 0;
+MAX_LENGTH = 0;
+
 % --- --- --- --- --- --- --- ---
 % --- folder with preprocecced data
 % --- --- --- --- --- --- --- ---
@@ -41,8 +51,7 @@ HOME_FOLDER = ['C:\Users\Sorti\OneDrive\Documents\GitHub\M-USE_Analysis\M-USE Da
 %'/Users/thiwom/Main/projects/201912_P_KioskFluBehavior/M_USE/GAMES_MATLAB_ANALYSIS'
 MUSEMATFOLDERNames = {}; iResultFolder = ''; iResultFile = '';
 
-
-SessionID_MZ = {'Frey_MZ_all_01'};
+ SessionID_MZ = {'Frey_MZ_all_01'};
 % SessionID_MZ = {'Wotan_MZ_all_01'};
 
 % MUSEMATFOLDERNames = 'MUSEMAT01_VS_EC_FL_MZG_Frey'
@@ -147,53 +156,64 @@ if do_LoadData == 1
                     res(iD).log{end+1} = sprintf('Index exceeds number of trials... iD=%d, %s', iD, datasets{iD});
                     continue;
                 end
-
                 % Check if there's data for the current index
                 if ~isempty(in.dat.trialData{idx})
                     % Initialize the structure for the current label if it does not exist
-                    if ~isfield(res(iD).data, strrep(label{1}, '_', ''))
-                        res(iD).data.(strrep(label{1}, '_', '')) = struct();
+                    labelStr = strrep(label{1}, '_', '');
+                    if ~isfield(res(iD).data, labelStr)
+                        res(iD).data.(labelStr) = struct();
                     end
 
                     trialData = in.dat.trialData{idx};
                     blockData = in.dat.blockData{idx};
                     blockDef = table2struct(in.dat.cfg_BlockDef{idx});
+                    res(iD).subjectName = trialData(1).SubjectID;
                     iT = 0;
+
+                    sessionDates = cellfun(@(x) regexp(x, 'Session_(\d+_\d+)', 'tokens'), {res(iD).dataset}, 'UniformOutput', false);
+                    sessionDates = cellfun(@(x) x{1}{1}, sessionDates, 'UniformOutput', false); % Convert tokens to strings
+
+                    currentSessionData = struct(); % data for the current session
+                    currentSessionData.sessionDatesFormatted = datetime(sessionDates, 'InputFormat', 'MM_dd', 'Format', 'MM/dd'); % Convert to datetime
+                    res(iD).sessionDatesFormatted = currentSessionData.sessionDatesFormatted;
+
                     for jj = 1:length(trialData)
                         if trialData(jj).AbortCode ~= 0
                             continue; % Skip to the next iteration of the loop
                         end
-                        % Assign trial data, block data, and block definitions
-                        currentData = res(iD).data.(strrep(label{1}, '_', ''));
-
-                        iT = iT + 1;
-                        currentData.subjectName{iT} = trialData(jj).SubjectID;%  trialData(iT).SubjectNum;
 
                         mazeStruct = jsondecode(blockDef(trialData(jj).BlockCount).MazeDef);
 
-                        currentData.mazeDefName{iT} = mazeStruct.mName;
                         nTurns = mazeStruct.mNumTurns;
                         mLength = mazeStruct.mNumSquares;
-                        currentData.mazeTurnsLength(iT,1:2) = [nTurns, mLength];
-                        currentData.blockNum(iT) = trialData(jj).BlockCount;
-                        currentData.trialInBlock(iT) = trialData(jj).TrialCount_InBlock;
 
-                        currentData.mazeDuration(iT) = trialData(jj).MazeDuration;
-                        currentData.sliderBarFilled(iT) = strcmp(trialData(jj).SliderBarFilled,'True');
-                        currentData.totalErrors(iT) = trialData(jj).TotalErrors;
-                        currentData.selectedTiles{iT} = strsplit(trialData(jj).SelectedTiles, ',');
-                        currentData.correctTouches(iT) = trialData(jj).CorrectTouches;
-                        currentData.retouchCorrect(iT) = trialData(jj).RetouchCorrect;
-                        currentData.retouchErroneous(iT) = trialData(jj).RetouchErroneous;
-                        currentData.backTrackingErrors(iT) = trialData(jj).BacktrackingErrors;
-                        currentData.ruleAbidingErrors(iT) = trialData(jj).Rule_AbidingErrors;
-                        currentData.ruleBreakingErrors(iT) = trialData(jj).Rule_BreakingErrors;
-                        currentData.perseverativeRetouchErroneous(iT) = trialData(jj).PerseverativeRetouchErrors;
-                        currentData.perseverativeBackTrackingErrors(iT) = trialData(jj).PerseverativeBackTrackErrors;
-                        currentData.perseverativeRuleAbidingErrors(iT) = trialData(jj).PerseverativeRuleAbidingErrors;
-                        currentData.perseverativeRuleBreakingErrors(iT) = trialData(jj).PerseverativeRuleBreakingErrors;
+                        iT = iT + 1;
+                        currentSessionData.subjectName{iT} = trialData(jj).SubjectID;%  trialData(iT).SubjectNum;
+                        currentSessionData.dayOfTheWeek(iT) = day(currentSessionData.sessionDatesFormatted, "longname");
+                        currentSessionData.mazeDefName{iT} = mazeStruct.mName;
+
+
+                        currentSessionData.mazeTurnsLength(iT,1:2) = [nTurns, mLength];
+                        currentSessionData.blockNum(iT) = trialData(jj).BlockCount;
+                        currentSessionData.trialInBlock(iT) = trialData(jj).TrialCount_InBlock;
+                        currentSessionData.mazeDuration(iT) = trialData(jj).MazeDuration;
+                        currentSessionData.sliderBarFilled(iT) = strcmp(trialData(jj).SliderBarFilled,'True');
+                        currentSessionData.totalErrors(iT) = trialData(jj).TotalErrors;
+                        currentSessionData.selectedTiles{iT} = strsplit(trialData(jj).SelectedTiles, ',');
+                        currentSessionData.correctTouches(iT) = trialData(jj).CorrectTouches;
+                        currentSessionData.retouchCorrect(iT) = trialData(jj).RetouchCorrect;
+                        currentSessionData.retouchErroneous(iT) = trialData(jj).RetouchErroneous;
+                        currentSessionData.backTrackingErrors(iT) = trialData(jj).BacktrackingErrors;
+                        currentSessionData.ruleAbidingErrors(iT) = trialData(jj).Rule_AbidingErrors;
+                        currentSessionData.ruleBreakingErrors(iT) = trialData(jj).Rule_BreakingErrors;
+                        currentSessionData.perseverativeRetouchErroneous(iT) = trialData(jj).PerseverativeRetouchErrors;
+                        currentSessionData.perseverativeBackTrackingErrors(iT) = trialData(jj).PerseverativeBackTrackErrors;
+                        currentSessionData.perseverativeRuleAbidingErrors(iT) = trialData(jj).PerseverativeRuleAbidingErrors;
+                        currentSessionData.perseverativeRuleBreakingErrors(iT) = trialData(jj).PerseverativeRuleBreakingErrors;
+
+
                         % Save the collected data back to the main structure
-                        res(iD).data.(strrep(label{1}, '_', '')) = currentData;
+                        res(iD).data.(strrep(label{1}, '_', '')) = currentSessionData;
                     end
                 else
                     res(iD).log{end+1} = sprintf('Trial data is empty for this label... iD=%d, %s', iD, datasets{iD});
@@ -222,7 +242,7 @@ end
 
 % --- --- --- --- --- --- --- --- --- --- --- --- ---
 % --- do some basic analysis
-% --- --- --- --- --- --- --- --- --- --- --- --- ---
+%% --- --- --- --- --- --- --- --- --- --- --- --- ---
 if do_AnalysisBasic == 1
 
     % Load results if they are not yet loaded
@@ -230,126 +250,183 @@ if do_AnalysisBasic == 1
         load(fullfile(RESULTFOLDER, iResultFile))
     end
 
-    if do_AcrossSessionAnalysis_SortedByMazeType == 1
-        % Extracting unique mazes based on new structure
+    if do_AcrossSessionAnalysis_SortedByMazeType == 1 % compile all unique combinations of turns and length across sessions
         allMazes = [];
         for i = 1:length(res)
-            if isfield(res(i).data, 'Maze1')
+            if isfield(res(i).data, 'Maze1') && ~isempty(fieldnames(res(i).data.Maze1))
                 allMazes = [allMazes; res(i).data.Maze1.mazeTurnsLength];
             end
-            if isfield(res(i).data, 'Maze1Repeat')
+            if isfield(res(i).data, 'Maze1Repeat') && ~isempty(fieldnames(res(i).data.Maze1Repeat))
                 allMazes = [allMazes; res(i).data.Maze1Repeat.mazeTurnsLength];
             end
         end
 
-        uniqueMazes = unique(allMazes, 'rows');
+        uniqueMazeConfigurations = unique(allMazes, 'rows');
+    end
 
-        % Filter uniqueMazes to include only those with a 16 length
-        % uniqueMazes= uniqueMazes(uniqueMazes(:,2) == 16, :);
+    if (do_AcrossSessionAnalysis_LearningCurve == 1 || do_AcrossSessionAnalysis_LearningCurve_ErrorRateDifferences == 1 || do_WithinSessionAnalysis == 1)
+        allTrials= [];
+        for i = 1:length(res)
+            if isfield(res(i).data, 'Maze1') && ~isempty(fieldnames(res(i).data.Maze1))
+                allTrials = [allTrials; res(i).data.Maze1.trialInBlock'];
+            end
+            if isfield(res(i).data, 'Maze1Repeat') && ~isempty(fieldnames(res(i).data.Maze1Repeat))
+                allTrials = [allTrials; res(i).data.Maze1Repeat.trialInBlock'];
+            end
+        end
 
-        % Initialize metrics structure
-        metrics_mz = struct();
-        metrics_mz.subjectName = res(1).data.Maze1.subjectName{1};
-        metrics_mz.numTurnsTiles = uniqueMazes;
-        metrics_mz.num = zeros(size(uniqueMazes, 1), 1);
-        metrics_mz.mazeDefNames = cell(size(uniqueMazes, 1), 1);
-        metrics_mz.sessionNumBlockNum = cell(size(uniqueMazes, 1), 1);
-        % New fields for normalized metrics
-        metrics_mz.normalizedDurations = cell(size(uniqueMazes, 1), 3); % First, Repeat, Aggregate
-        metrics_mz.normalizedTotalErrors = cell(size(uniqueMazes, 1), 3); % and so on
-        metrics_mz.normalizedRuleAbidingErrors = cell(size(uniqueMazes, 1), 3);
-        metrics_mz.normalizedRuleBreakingErrors = cell(size(uniqueMazes, 1), 3);
-        metrics_mz.normalizedPerseverationErrors = cell(size(uniqueMazes, 1), 3);
+        uniqueTrialCounts = unique(allTrials, 'rows');
+    end
 
-        % Analyze each unique maze configuration
-        for iL = 1:size(uniqueMazes, 1)
-            % Variables to accumulate metrics
-            durationsFirst = [];
-            durationsRepeat = [];
-            totalErrorsFirst = [];
-            totalErrorsRepeat = [];
-            % Similar variables for other metrics...
 
-            for iD = 1:length(res)
-                % Handle Maze1
-                if isfield(res(iD).data, 'Maze1')
-                    maze1 = res(iD).data.Maze1;
-                    sel = find(maze1.mazeTurnsLength(:,1) ==  uniqueMazes(iL,1) & maze1.mazeTurnsLength(:,2) == uniqueMazes(iL,2));
-                    if ~isempty(sel)
-                        durationsFirst = [durationsFirst, maze1.mazeDuration(sel) ./ maze1.mazeTurnsLength(sel,2)'];
-                        totalErrorsFirst = [totalErrorsFirst, maze1.totalErrors(sel) ./ maze1.mazeTurnsLength(sel,2)'];                    end
+    % Initialize the empty arrays to store data for the respective analysis
+    % type
+    mazeTypes = {'Maze1', 'Maze1Repeat', 'Aggregate'};
+    metrics = {'normalizedTotalErrors', 'normalizedDurations', ...
+        'normalizedRuleBreakingErrors', 'normalizedRuleAbidingErrors', ...
+        'normalizedPerseverativeErrors'};
+
+    if do_AcrossSessionAnalysis_SortedByMazeType == 1
+        metrics = [metrics, {'numTurns', 'numLength'}];
+        metricsLength = size(uniqueMazeConfigurations, 1);
+    elseif do_AcrossSessionAnalysis_SortedBySession == 1
+        metrics = [metrics, {'sessionDate'}];
+        metricsLength = length(res);
+    elseif do_AcrossSessionAnalysis_SortedByWeekday == 1
+        metrics = [metrics, {'dayOfTheWeek'}];
+        metricsLength = 5;
+    elseif (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1)
+        metrics = [metrics, {'trialInBlock'}];
+        metricsLength = size(uniqueTrialCounts, 1);
+    elseif(do_AcrossSessionAnalysis_LearningCurve_ErrorRateDifferences == 1 )
+        metrics = [metrics, {'trialInBlock', 'errorRateDifference'}];
+        metricsLength = size(uniqueTrialCounts, 1);
+    end
+
+
+    % Initialize the structure
+    metrics_mz = struct();
+
+    % Iterate through each maze type and metric to initialize arrays
+
+    for i = 1:length(mazeTypes)
+        mazeType = mazeTypes{i};
+        for j = 1:length(metrics)
+            metric = metrics{j};
+            metrics_mz.(mazeType).(metric) = cell(metricsLength, 1);
+        end
+    end
+
+    if(do_WithinSessionAnalysis ==1 )
+        SESSION_DATE = "03/18";
+        sessionIdx = find(res.sessionDatesFormatted == SESSION_DATE);
+
+        initialMazeData = res(sessionIdx).data.Maze1;
+        repeatMazeData = res(sessionIdx).data.Maze1Repeat;
+        metrics_mz = AppendMetrics(metrics_mz, 'Maze1', initialMazeData, iL, filteredMaze1Indices);
+        metrics_mz.Maze1.sessionDate{sessionIdx} = initialMazeData.sessionDatesFormatted;
+
+        metrics_mz = AppendMetrics(metrics_mz, 'Maze1Repeat', repeatMazeData, iL, filteredMaze1Indices);
+
+        metrics_mz.Maze1Repeat.sessionDate{sessionIdx} = repeatMazeData.sessionDatesFormatted;
+
+    else
+        for sessionIdx = 1:length(res)
+            initialMazeData = res(sessionIdx).data.Maze1;
+            repeatMazeData = res(sessionIdx).data.Maze1Repeat;
+            if do_AcrossSessionAnalysis_SortedByMazeType == 1
+                for iL = 1:size(uniqueMazeConfigurations, 1)
+                    filteredMaze1Indices = find(initialMazeData.mazeTurnsLength(:,1) ==  uniqueMazeConfigurations(iL,1) & initialMazeData.mazeTurnsLength(:,2) == uniqueMazeConfigurations(iL,2));
+                    % if ~isempty(filteredMaze1Indices)
+                    metrics_mz = AppendMetrics(metrics_mz, 'Maze1', initialMazeData, iL, filteredMaze1Indices);
+                    metrics_mz.Maze1.numTurns{iL} = uniqueMazeConfigurations(iL,1);
+                    metrics_mz.Maze1.numLength{iL} = uniqueMazeConfigurations(iL,2);
+
+                    filteredMaze1RepeatIndices = find(repeatMazeData.mazeTurnsLength(:,1) ==  uniqueMazeConfigurations(iL,1) & repeatMazeData.mazeTurnsLength(:,2) == uniqueMazeConfigurations(iL,2));
+                    % if ~isempty(filteredMaze1RepeatIndices)
+                    metrics_mz = AppendMetrics(metrics_mz, 'Maze1Repeat', repeatMazeData, iL, filteredMaze1RepeatIndices);
+                    metrics_mz.Maze1Repeat.numTurns{iL} = uniqueMazeConfigurations(iL,1);
+                    metrics_mz.Maze1Repeat.numLength{iL} = uniqueMazeConfigurations(iL,2);
                 end
 
-                % Handle Maze1Repeat
-                if isfield(res(iD).data, 'Maze1Repeat')
-                    maze1Repeat = res(iD).data.Maze1Repeat;
-                    sel = find(maze1Repeat.mazeTurnsLength(:,1) ==  uniqueMazes(iL,1) & maze1Repeat.mazeTurnsLength(:,2) == uniqueMazes(iL,2));
-                    if ~isempty(sel)
-                        durationsRepeat = [durationsRepeat, maze1Repeat.mazeDuration(sel) ./ maze1Repeat.mazeTurnsLength(sel,2)'];
-                        totalErrorsRepeat = [totalErrorsRepeat, maze1Repeat.totalErrors(sel) ./ maze1Repeat.mazeTurnsLength(sel,2)'];
+            elseif do_AcrossSessionAnalysis_SortedBySession == 1
+                metrics_mz = AppendMetrics(metrics_mz, 'Maze1', initialMazeData, sessionIdx, 1:height(initialMazeData.mazeTurnsLength));
+                metrics_mz.Maze1.sessionDate{sessionIdx} = initialMazeData.sessionDatesFormatted;
+
+                metrics_mz = AppendMetrics(metrics_mz, 'Maze1Repeat', repeatMazeData, sessionIdx, 1:height(repeatMazeData.mazeTurnsLength));
+                metrics_mz.Maze1Repeat.sessionDate{sessionIdx} = repeatMazeData.sessionDatesFormatted;
+
+            elseif do_AcrossSessionAnalysis_SortedByWeekday == 1
+                daysOfTheWeek = {'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'};
+                for iDay = 1:5
+                    day = daysOfTheWeek(iDay);
+                    filteredMaze1Indices = find(strcmpi(initialMazeData.dayOfTheWeek(1,:), day));
+                    metrics_mz = AppendMetrics(metrics_mz, 'Maze1', initialMazeData, iDay, filteredMaze1Indices);
+                    metrics_mz.Maze1.dayOfTheWeek(iDay) = day;
+
+                    filteredMaze1RepeatIndices = find(strcmpi(repeatMazeData.dayOfTheWeek(1,:), day));
+                    metrics_mz = AppendMetrics(metrics_mz, 'Maze1Repeat', repeatMazeData, iDay, filteredMaze1RepeatIndices);
+                    metrics_mz.Maze1Repeat.dayOfTheWeek(iDay) = day;
+                end
+            elseif (do_AcrossSessionAnalysis_LearningCurve == 1)
+                for iTrialInBlock = 1:height(uniqueTrialCounts)
+                    filteredMaze1Indices = find(initialMazeData.trialInBlock == iTrialInBlock);
+                    metrics_mz = AppendMetrics(metrics_mz, 'Maze1', initialMazeData, iTrialInBlock, filteredMaze1Indices);
+                    metrics_mz.Maze1.trialInBlock = iTrialInBlock;
+
+                    filteredMaze1RepeatIndices = find(repeatMazeData.trialInBlock == iTrialInBlock);
+                    metrics_mz = AppendMetrics(metrics_mz, 'Maze1Repeat', repeatMazeData, iTrialInBlock, filteredMaze1RepeatIndices);
+                    metrics_mz.Maze1Repeat.trialInBlock = iTrialInBlock;
+                end
+
+            elseif (do_AcrossSessionAnalysis_LearningCurve_ErrorRateDifferences == 1)
+                % Process for initialMazeData and repeatMazeData
+                mazeDataArray = {initialMazeData; repeatMazeData};
+                for i = 1:length(mazeDataArray)
+                    currentMazeData = mazeDataArray{i};
+                    uniqueBlocks = unique(currentMazeData.blockNum);
+
+                    for iBlock = 1:length(uniqueBlocks)
+                        blockNum = uniqueBlocks(iBlock);
+
+                        % Find all trials in this block, sorted
+                        blockTrialsIndices = find(currentMazeData.blockNum == blockNum);
+                        [~, sortIdx] = sort(currentMazeData.trialInBlock(blockTrialsIndices));
+                        sortedTrialsIndices = blockTrialsIndices(sortIdx);
+
+                        prevError = NaN; % Initialize as NaN for the first trial in each block
+
+                        for iTrialIdx = 1:length(sortedTrialsIndices)
+                            idx = sortedTrialsIndices(iTrialIdx);
+                            trialInBlock = currentMazeData.trialInBlock(idx);
+                            proportionalError = currentMazeData.normalizedError(idx); % Example calculation
+
+                            % Calculate errorRateDifference
+                            if ~isnan(prevError) % Skip for the first trial in the block
+                                errorRateDifference = proportionalError - prevError;
+                                % Append this errorRateDifference to metrics_mz
+                                metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock} = [metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock}; errorRateDifference];
+                            else
+                                % For the first trial in the block, append NaN
+                                metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock} = [metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock}; NaN];
+                            end
+
+                            % Append proportionalError for the current trial
+                            metrics_mz.(mazeType{1}).normalizedTotalErrors{trialInBlock} = [metrics_mz.(mazeType{1}).normalizedTotalErrors{trialInBlock}; proportionalError];
+
+                            % Update prevError for the next iteration
+                            prevError = proportionalError;
+                        end
                     end
                 end
             end
 
-            % Aggregate metrics (First, Repeat, and Combined)
-            metrics_mz.normalizedDurations{iL, 1} = durationsFirst;
-            metrics_mz.normalizedDurations{iL, 2} = durationsRepeat;
-            metrics_mz.normalizedDurations{iL, 3} = [durationsFirst, durationsRepeat];
-
-            metrics_mz.normalizedTotalErrors{iL, 1} = totalErrorsFirst;
-            metrics_mz.normalizedTotalErrors{iL, 2} = totalErrorsRepeat;
-            metrics_mz.normalizedTotalErrors{iL, 3} = [totalErrorsFirst, totalErrorsRepeat];
-
         end
-        % Save analysis results
-        save(fullfile(RESULTFOLDER, iResultFileMetrics), 'res', 'metrics_mz', '-v7.3')
-        disp(['Saved metrics mat-file of n=', num2str(length(res)), ' datasets in ', iResultFileMetrics]);
 
+        metrics_mz = AggregateMetrics(metrics_mz);
 
-    end
-    if do_AcrossSessionAnalysis_SortedBySession == 1
-        % Initialize structures to store the aggregated metrics
-        metrics_mz1 = struct('normalizedDurations', {}, 'normalizedTotalErrors', {}, 'normalizedRuleAbidingErrors', {}, 'normalizedRuleBreakingErrors', {}, 'normalizedPerseverationErrors', {});
-        metrics_mz1Repeat = struct('normalizedDurations', {}, 'normalizedTotalErrors', {}, 'normalizedRuleAbidingErrors', {}, 'normalizedRuleBreakingErrors', {}, 'normalizedPerseverationErrors', {});
-
-        for i = 1:length(res)
-            if isfield(res(i).data, 'Maze1')
-                pathLengthMaze1 = res(i).data.Maze1.mazeTurnsLength(:,2)';
-                metrics_mz1(i).meanNormalizedDurations = mean((res(i).data.Maze1.mazeDuration ./ pathLengthMaze1), 'omitnan');
-                metrics_mz1(i).meanNormalizedTotalErrors = mean((res(i).data.Maze1.totalErrors ./ pathLengthMaze1), 'omitnan');
-                metrics_mz1(i).meanNormalizedRuleAbidingErrors = mean((res(i).data.Maze1.ruleAbidingErrors ./ pathLengthMaze1), 'omitnan');
-                metrics_mz1(i).meanNormalizedRuleBreakingErrors = mean((res(i).data.Maze1.ruleBreakingErrors ./ pathLengthMaze1), 'omitnan');
-
-                sumOfPerseverativeErrors = res(i).data.Maze1.perseverativeRuleBreakingErrors + ...
-                    res(i).data.Maze1.perseverativeRuleAbidingErrors + ...
-                    res(i).data.Maze1.perseverativeRetouchErroneous;
-                metrics_mz1(i).meanNormalizedPerseverationErrors = mean((sumOfPerseverativeErrors ./ pathLengthMaze1), 'omitnan');
-            end
-
-            if isfield(res(i).data, 'Maze1Repeat')
-                pathLengthMaze1Repeat = res(i).data.Maze1Repeat.mazeTurnsLength(:,2)';
-                metrics_mz1Repeat(i).meanNormalizedDurations = mean((res(i).data.Maze1Repeat.mazeDuration ./ pathLengthMaze1Repeat), 'omitnan');
-                metrics_mz1Repeat(i).meanNormalizedTotalErrors = mean((res(i).data.Maze1Repeat.totalErrors ./ pathLengthMaze1Repeat), 'omitnan');
-                metrics_mz1Repeat(i).meanNormalizedRuleAbidingErrors = mean((res(i).data.Maze1Repeat.ruleAbidingErrors ./ pathLengthMaze1Repeat), 'omitnan');
-                metrics_mz1Repeat(i).meanNormalizedRuleBreakingErrors = mean((res(i).data.Maze1Repeat.ruleBreakingErrors ./ pathLengthMaze1Repeat), 'omitnan');
-
-                sumOfPerseverativeErrors = res(i).data.Maze1Repeat.perseverativeRuleBreakingErrors + ...
-                    res(i).data.Maze1Repeat.perseverativeRuleAbidingErrors + ...
-                    res(i).data.Maze1Repeat.perseverativeRetouchErroneous;
-                metrics_mz1Repeat(i).meanNormalizedPerseverationErrors = mean((sumOfPerseverativeErrors ./ pathLengthMaze1Repeat), 'omitnan');
-            end
-        end
-    end
-
-    if do_WithinSessionAnalysis == 1
-        % Initialize metrics structure
-        metrics_mz1 = res(13).data.Maze1;
-        metrics_mz1Repeat = res(13).data.Maze1Repeat;
     end
 end
-
-
-
 
 if do_AnalysisBasicPlot == 1
 
@@ -367,7 +444,7 @@ if do_AnalysisBasicPlot == 1
     %  --- --- --- --- --- --- ---
 
 
-    if PLOT_ACROSSSESSIONS_SortedByMazeType == 1
+    if do_AcrossSessionAnalysis_SortedByMazeType == 1
 
         figure('Color', 'w');
         set(gcf, 'Position', [100, 100, 1200, 600]); % Adjust figure size to fit 4 plots in a row
@@ -482,11 +559,8 @@ if do_AnalysisBasicPlot == 1
     end
 
 
-    if PLOT_ACROSSSESSIONS_SortedBySession == 1
+    if do_AcrossSessionAnalysis_SortedBySession == 1
         % Extract session dates from dataset names
-        sessionDates = cellfun(@(x) regexp(x, 'Session_(\d+_\d+)', 'tokens'), {res.dataset}, 'UniformOutput', false);
-        sessionDates = cellfun(@(x) x{1}{1}, sessionDates, 'UniformOutput', false); % Convert tokens to strings
-        sessionDatesFormatted = datetime(sessionDates, 'InputFormat', 'MM_dd', 'Format', 'MM/dd'); % Convert to datetime
 
         % Initialize arrays to hold the means for plotting
         normalizedDurationsDiff = [];
@@ -563,6 +637,162 @@ if do_AnalysisBasicPlot == 1
         % Add legend in the last plot
         legend('Location', 'best');
     end
+    if do_AcrossSessionAnalysis_SortedByWeekday == 1
+
+        weekdays = {'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'};
+        nDays = numel(weekdays); % Number of weekdays to plot
+        metricsNames = {'normalizedDurations', 'normalizedTotalErrors', 'normalizedRuleAbidingErrors', 'normalizedRuleBreakingErrors', 'normalizedPerseverativeErrors'};
+        colors = {'b', 'r', 'g', 'm', 'c'}; % Assign a color for each metric for clarity
+
+        % Function to calculate SEM
+        calcSEM = @(data) std(data, 'omitnan') / sqrt(length(data));
+
+        % Creating a figure to hold all subplots
+        figure('Color', 'w', 'Position', [100, 100, 1200, 900]); % Adjust size as needed
+        sgtitle([res(1).subjectName ' Weekday Performance'])
+
+        for iMetric = 1:length(metricsNames)
+            metricName = metricsNames{iMetric};
+            color = colors{iMetric};
+
+            % Create a subplot for each metric
+            subplot(3, 2, iMetric); % Adjust the grid size if necessary
+            hold on;
+
+            for iDay = 1:nDays
+                dayName = weekdays{iDay};
+
+                % Assuming the existence of these metrics for each day
+                metricData = metrics_mz.(dayName).(metricName);
+                medianMetric = median(metricData, 'omitnan');
+                semMetric = calcSEM(metricData);
+
+                % Plot with error bars
+                errorbar(iDay, medianMetric, semMetric, 'o', 'MarkerFaceColor', color, 'Color', color);
+            end
+
+            xlim([0.5, nDays + 0.5]);
+            xticks(1:nDays);
+            xticklabels(weekdays);
+            xlabel('Day of the Week');
+            ylabel(strrep(metricName, 'normalized', ''));
+            title(strrep(metricName, 'normalized', 'Normalized '));
+
+            hold off;
+        end
+
+    end
+    if(do_AcrossSessionAnalysis_LearningCurve == 1)
+        figure;
+
+        % Improvement threshold
+        improvementThreshold = 0.50;
+
+        % --- Subplot 1: Scatter plot of raw normalizedTotalErrors ---
+        subplot(2, 1, 1); % This specifies a 2-row, 1-column grid of subplots, and activates the first subplot.
+        hold on;
+        trialCounts = length(metrics_mz.Aggregate.normalizedTotalErrors);
+        for iTrial = 1:trialCounts
+            if ~isempty(metrics_mz.Aggregate.normalizedTotalErrors{iTrial})
+                trialIndices = iTrial * ones(size(metrics_mz.Aggregate.normalizedTotalErrors{iTrial}));
+                errorRates = metrics_mz.Aggregate.normalizedTotalErrors{iTrial};
+                isBelowThreshold = errorRates <= improvementThreshold;
+                scatter(trialIndices(~isBelowThreshold), errorRates(~isBelowThreshold), 'MarkerEdgeColor', 'b');
+                scatter(trialIndices(isBelowThreshold), errorRates(isBelowThreshold), 'MarkerEdgeColor', 'r');
+            end
+        end
+        xlabel('Trial Count in Block');
+        ylabel('Normalized Total Error Rate');
+        title('Raw Error Rates per Trial');
+        legend('Above Threshold', 'Below Threshold', 'Location', 'best');
+        grid on;
+        hold off;
+
+        % --- Subplot 2: Error bars for average normalizedTotalErrors per trialCountInBlock, excluding outliers ---
+        subplot(2, 1, 2); % Activates the second subplot
+        trialCounts = length(metrics_mz.Aggregate.normalizedTotalErrors);
+        avgErrorRates = NaN(1, trialCounts);
+        stderrErrorRates = NaN(1, trialCounts); % Standard Error of the mean, excluding outliers
+        for iTrial = 1:trialCounts
+            if ~isempty(metrics_mz.Aggregate.normalizedTotalErrors{iTrial})
+                % Extract error rates for the current trial
+                errorRates = metrics_mz.Aggregate.normalizedTotalErrors{iTrial};
+
+                % Identify and remove outliers using the interquartile range (IQR)
+                Q1 = quantile(errorRates, 0.25);
+                Q3 = quantile(errorRates, 0.75);
+                IQR = Q3 - Q1;
+                lowerBound = Q1 - 1.5 * IQR;
+                upperBound = Q3 + 1.5 * IQR;
+                nonOutliers = errorRates(errorRates >= lowerBound & errorRates <= upperBound);
+                disp(size(errorRates, 2) - length(nonOutliers))
+                % Calculate the average and standard error for non-outlier error rates
+                if ~isempty(nonOutliers) % Ensure there are non-outlier points to calculate
+                    avgErrorRates(iTrial) = mean(nonOutliers);
+                    stderrErrorRates(iTrial) = std(nonOutliers) / sqrt(length(nonOutliers));
+                end
+            end
+        end
+
+        % Plot the error bars for average error rates excluding outliers
+        errorbar(1:trialCounts, avgErrorRates, stderrErrorRates, 'o-');
+        xlabel('Trial Count in Block');
+        ylabel('Average Normalized Total Error Rate ');
+        title('Average Normalized Total Error Rate per Trial with Standard Error (Excluding Outliers)');
+        grid on;
+
+
+
+
+        % metricsNames = {'normalizedTotalErrors', 'normalizedDurations', 'normalizedRuleAbidingErrors', 'normalizedRuleBreakingErrors', 'normalizedPerseverativeErrors'};
+        %
+        % % Colors assigned for Maze1, Maze1Repeat, and Aggregate
+        % mazeColors = {'b', 'r', 'k'}; % Blue for Maze1, Red for Maze1Repeat, Black for Aggregate
+        %
+        % % Function to calculate SEM
+        % calcSEM = @(data) std(data, 'omitnan') / sqrt(length(data));
+        %
+        % % Creating a figure to hold all subplots
+        % figure('Color', 'w', 'Position', [100, 100, 1200, 900]); % Adjust size as needed
+        % % Construct the title string
+        % titleStr = sprintf('%s Learning Curve', res(1).subjectName);
+        %
+        % % Set the title using sgtitle without any LaTeX formatting issues
+        % sgtitle(titleStr, 'Interpreter', 'none');
+        % uniqueTrials = unique([metrics_mz.Aggregate.trialInBlock]); % Assume Aggregate covers the same trials
+        % nTrials = numel(uniqueTrials); % Number of unique trial blocks to plot
+        %
+        % for iMetric = 1:length(metricsNames)
+        %     metricName = metricsNames{iMetric};
+        %
+        %     % Create a subplot for each metric
+        %     subplot(ceil(length(metricsNames) / 2), 2, iMetric); % Adjust grid size if necessary
+        %     hold on;
+        %
+        %     % % Plotting for Maze1
+        %     % means = arrayfun(@(t) mean(metrics_mz.Maze1.(metricName)(metrics_mz.Maze1.trialInBlock == t), 'omitnan'), uniqueTrials);
+        %     % sems = arrayfun(@(t) calcSEM(metrics_mz.Maze1.(metricName)(metrics_mz.Maze1.trialInBlock == t)), uniqueTrials);
+        %     % errorbar(uniqueTrials, means, sems, 'o-', 'Color', mazeColors{1}, 'DisplayName', 'Maze1', 'MarkerFaceColor', mazeColors{1});
+        %     %
+        %     % % Plotting for Maze1Repeat
+        %     % means = arrayfun(@(t) mean(metrics_mz.Maze1Repeat.(metricName)(metrics_mz.Maze1Repeat.trialInBlock == t), 'omitnan'), uniqueTrials);
+        %     % sems = arrayfun(@(t) calcSEM(metrics_mz.Maze1Repeat.(metricName)(metrics_mz.Maze1Repeat.trialInBlock == t)), uniqueTrials);
+        %     % errorbar(uniqueTrials, means, sems, 'o-', 'Color', mazeColors{2}, 'DisplayName', 'Maze1Repeat', 'MarkerFaceColor', mazeColors{2});
+        %
+        %     % Plotting for Aggregate
+        %     means = arrayfun(@(t) mean(metrics_mz.Aggregate.(metricName)(metrics_mz.Aggregate.trialInBlock == t), 'omitnan'), uniqueTrials);
+        %     sems = arrayfun(@(t) calcSEM(metrics_mz.Aggregate.(metricName)(metrics_mz.Aggregate.trialInBlock == t)), uniqueTrials);
+        %     errorbar(uniqueTrials, means, sems, 'o-', 'Color', mazeColors{3}, 'DisplayName', 'Aggregate', 'MarkerFaceColor', mazeColors{3});
+        %
+        %     title(metricName);
+        %     xlabel('Trial in Block');
+        %     ylabel(metricName);
+        %     legend show;
+        %
+        %     hold off;
+        % end
+    end
+
 
 
     if(PLOT_INDIVIDUALSESSIONS)
@@ -572,6 +802,7 @@ if do_AnalysisBasicPlot == 1
         blockNumsInitial = metrics_mz1.blockNum;
         trialInBlockInitial = metrics_mz1.trialInBlock;
         totalErrorsInitial = metrics_mz1.totalErrors;
+        normalizeDurationsInitial = metrics_mz1.normalizedDurati
         mazeDefNameInitial = metrics_mz1.mazeDefName;
 
         blockNumsRepeat = metrics_mz1Repeat.blockNum;
@@ -637,13 +868,14 @@ if do_AnalysisBasicPlot == 1
         % Finalize the second subplot, repeating legend setup if necessary
         subplot(1, 2, 2);
         xlabel('Trial Number Within Block');
-        ylabel('Normalized Maze Duration');
-        title('Normalized Maze Durations');
+        ylabel('Normalized Total Errors');
+        title('Normalized Total Errors');
         legend(hLines, legendEntries, 'Location', 'best');
         grid on;
 
         set(gcf, 'Position', [100, 100, 1400, 600]);
     end
+
 
 
     % Optionally save the figures
@@ -667,6 +899,64 @@ if do_AnalysisBasicPlot == 1
     %     ylabel('prop errors in block'), xlabel('trial in block')
     %     legend(iLegend)
 
+
 end
 
 disp('done, return'), return
+
+
+
+function metrics_mz = ExtractMetrics(mazeData, mazeType)
+
+% mazeData will contain the data from Maze1 or Maze1Repeat for each session
+
+if do_AcrossSessionAnalysis_SortedByMazeType
+    % If sorting/filtering by Maze Type, extract metrics accordingly.
+    % Assuming mazeTurnsLength first element can be used to distinguish types.
+    if mazeData.mazeTurnsLength(j,1) == someConditionForMazeType
+        metrics_mz = AppendMetrics(metrics_mz, mazeType, mazeData, j);
+    end
+    % Additional logic to handle different maze types can be added here.
+
+elseif do_AcrossSessionAnalysis_SortedBySession
+    % FILTERED BY RES INDEX
+    % If sorting/filtering by Session, you might need session-specific data
+    % which should be included in mazeData or handled externally.
+
+elseif do_AcrossSessionAnalysis_SortedByWeekday
+    % NEED TO FIND ALL SESSION WEEKDAYS {''}
+    % Similar to session, handling based on weekday.
+
+elseif (do_AcrossSessionAnalysis_LearningCurve || do_WithinSessionAnalysis)
+    % FILTERED BY THE TRIAL COUNT IN BLOCK
+    % If handling learning curves or within session analysis,
+    % it could be direct extraction without specific conditions.
+    metrics_mz = AppendMetrics(metrics_mz, mazeType, mazeData, j);
+end
+end
+
+
+function metrics_mz = AppendMetrics(metrics_mz, mazeType, mazeData, metricsIndex, mazeDataIndex)
+
+metrics_mz.(mazeType)   .normalizedTotalErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedTotalErrors{metricsIndex}, mazeData.totalErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
+metrics_mz.(mazeType).normalizedDurations{metricsIndex} = [metrics_mz.(mazeType).normalizedDurations{metricsIndex}, mazeData.mazeDuration(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
+metrics_mz.(mazeType).normalizedRuleBreakingErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedRuleBreakingErrors{metricsIndex}, mazeData.ruleBreakingErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
+metrics_mz.(mazeType).normalizedRuleAbidingErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedRuleAbidingErrors{metricsIndex}, mazeData.ruleAbidingErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
+
+sumOfPerseverativeErrors = mazeData.perseverativeRuleBreakingErrors(mazeDataIndex) + ...
+    mazeData.perseverativeRuleAbidingErrors(mazeDataIndex) + ...
+    mazeData.perseverativeRetouchErroneous(mazeDataIndex);
+
+metrics_mz.(mazeType).normalizedPerseverativeErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedPerseverativeErrors{metricsIndex}, sumOfPerseverativeErrors ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
+
+end
+
+function metrics_mz = AggregateMetrics(metrics_mz)
+fields = fieldnames(metrics_mz.Maze1);
+for f = 1:length(fields)
+    fieldName = fields{f};
+    metrics_mz.Aggregate.(fieldName) = [metrics_mz.Maze1.(fieldName), metrics_mz.Maze1Repeat.(fieldName)];
+end
+end
+
+
