@@ -23,14 +23,14 @@
 %    at http://www.gnu.org/licenses/
 
 
-do_LoadData = 1;
+do_LoadData = 0;
 do_AnalysisBasic = 1;
 do_AnalysisBasicPlot = 1;
 do_AcrossSessionAnalysis_SortedByMazeType = 0;
 do_AcrossSessionAnalysis_SortedBySession = 0;
 do_AcrossSessionAnalysis_SortedByWeekday = 0;
-do_AcrossSessionAnalysis_LearningCurve = 1;
-do_AcrossSessionAnalysis_LearningCurve_ErrorRateDifferences = 0;
+do_AcrossSessionAnalysis_LearningCurve = 0;
+do_AcrossSessionAnalysis_TurnVsStraightErrorRate = 1;
 
 
 do_WithinSessionAnalysis = 0; % NEEDS TO BE UPDATED
@@ -39,8 +39,8 @@ DO_SAVEFIGURES = 0;
 
 PLOT_INDIVIDUALSESSIONS = 0;
 
-MIN_TURNS = 4; % SET TO 0 TO IGNORE TRIAL DATA FILTERING
-MIN_LENGTH = 14;
+MIN_TURNS = 4; % SET TO 0 TO IGNORE TRIAL DATA FILTERING, NEEDS TO BE UPDATED
+MIN_LENGTH = 14; % NEEDS TO BE UPDATED
 MAX_TURNS = 0;
 MAX_LENGTH = 0;
 
@@ -51,7 +51,7 @@ HOME_FOLDER = ['C:\Users\Sorti\OneDrive\Documents\GitHub\M-USE_Analysis\M-USE Da
 %'/Users/thiwom/Main/projects/201912_P_KioskFluBehavior/M_USE/GAMES_MATLAB_ANALYSIS'
 MUSEMATFOLDERNames = {}; iResultFolder = ''; iResultFile = '';
 
- SessionID_MZ = {'Frey_MZ_all_01'};
+SessionID_MZ = {'Frey_MZ_all_01'};
 % SessionID_MZ = {'Wotan_MZ_all_01'};
 
 % MUSEMATFOLDERNames = 'MUSEMAT01_VS_EC_FL_MZG_Frey'
@@ -191,6 +191,7 @@ if do_LoadData == 1
                         currentSessionData.subjectName{iT} = trialData(jj).SubjectID;%  trialData(iT).SubjectNum;
                         currentSessionData.dayOfTheWeek(iT) = day(currentSessionData.sessionDatesFormatted, "longname");
                         currentSessionData.mazeDefName{iT} = mazeStruct.mName;
+                        currentSessionData.mazePath{iT} = mazeStruct.mPath;
 
 
                         currentSessionData.mazeTurnsLength(iT,1:2) = [nTurns, mLength];
@@ -200,6 +201,7 @@ if do_LoadData == 1
                         currentSessionData.sliderBarFilled(iT) = strcmp(trialData(jj).SliderBarFilled,'True');
                         currentSessionData.totalErrors(iT) = trialData(jj).TotalErrors;
                         currentSessionData.selectedTiles{iT} = strsplit(trialData(jj).SelectedTiles, ',');
+                        currentSessionData.errorTypes{iT} = determineSelectionError( currentSessionData.selectedTiles{iT}, mazeStruct.mPath);
                         currentSessionData.correctTouches(iT) = trialData(jj).CorrectTouches;
                         currentSessionData.retouchCorrect(iT) = trialData(jj).RetouchCorrect;
                         currentSessionData.retouchErroneous(iT) = trialData(jj).RetouchErroneous;
@@ -249,7 +251,6 @@ if do_AnalysisBasic == 1
     if ~exist('res', 'var')
         load(fullfile(RESULTFOLDER, iResultFile))
     end
-
     if do_AcrossSessionAnalysis_SortedByMazeType == 1 % compile all unique combinations of turns and length across sessions
         allMazes = [];
         for i = 1:length(res)
@@ -282,25 +283,27 @@ if do_AnalysisBasic == 1
     % Initialize the empty arrays to store data for the respective analysis
     % type
     mazeTypes = {'Maze1', 'Maze1Repeat', 'Aggregate'};
-    metrics = {'normalizedTotalErrors', 'normalizedDurations', ...
+    standardMetrics = {'normalizedTotalErrors', 'normalizedDurations', ...
         'normalizedRuleBreakingErrors', 'normalizedRuleAbidingErrors', ...
         'normalizedPerseverativeErrors'};
 
     if do_AcrossSessionAnalysis_SortedByMazeType == 1
-        metrics = [metrics, {'numTurns', 'numLength'}];
+        metrics = [standardMetrics, {'numTurns', 'numLength'}];
         metricsLength = size(uniqueMazeConfigurations, 1);
     elseif do_AcrossSessionAnalysis_SortedBySession == 1
-        metrics = [metrics, {'sessionDate'}];
+        metrics = [standardMetrics, {'sessionDate'}];
         metricsLength = length(res);
     elseif do_AcrossSessionAnalysis_SortedByWeekday == 1
-        metrics = [metrics, {'dayOfTheWeek'}];
+        metrics = [standardMetrics, {'dayOfTheWeek'}];
         metricsLength = 5;
     elseif (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1)
-        metrics = [metrics, {'trialInBlock'}];
+        metrics = [standardMetrics, {'trialInBlock'}];
         metricsLength = size(uniqueTrialCounts, 1);
-    elseif(do_AcrossSessionAnalysis_LearningCurve_ErrorRateDifferences == 1 )
-        metrics = [metrics, {'trialInBlock', 'errorRateDifference'}];
-        metricsLength = size(uniqueTrialCounts, 1);
+    elseif(do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1 )
+        metrics = {'totalErrors', ...
+        'ruleBreakingErrors', 'ruleAbidingErrors', ...
+        'perseverativeErrors', 'retouchErrors'};
+        metricsLength = 2;
     end
 
 
@@ -379,46 +382,12 @@ if do_AnalysisBasic == 1
                     metrics_mz.Maze1Repeat.trialInBlock = iTrialInBlock;
                 end
 
-            elseif (do_AcrossSessionAnalysis_LearningCurve_ErrorRateDifferences == 1)
-                % Process for initialMazeData and repeatMazeData
-                mazeDataArray = {initialMazeData; repeatMazeData};
-                for i = 1:length(mazeDataArray)
-                    currentMazeData = mazeDataArray{i};
-                    uniqueBlocks = unique(currentMazeData.blockNum);
-
-                    for iBlock = 1:length(uniqueBlocks)
-                        blockNum = uniqueBlocks(iBlock);
-
-                        % Find all trials in this block, sorted
-                        blockTrialsIndices = find(currentMazeData.blockNum == blockNum);
-                        [~, sortIdx] = sort(currentMazeData.trialInBlock(blockTrialsIndices));
-                        sortedTrialsIndices = blockTrialsIndices(sortIdx);
-
-                        prevError = NaN; % Initialize as NaN for the first trial in each block
-
-                        for iTrialIdx = 1:length(sortedTrialsIndices)
-                            idx = sortedTrialsIndices(iTrialIdx);
-                            trialInBlock = currentMazeData.trialInBlock(idx);
-                            proportionalError = currentMazeData.normalizedError(idx); % Example calculation
-
-                            % Calculate errorRateDifference
-                            if ~isnan(prevError) % Skip for the first trial in the block
-                                errorRateDifference = proportionalError - prevError;
-                                % Append this errorRateDifference to metrics_mz
-                                metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock} = [metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock}; errorRateDifference];
-                            else
-                                % For the first trial in the block, append NaN
-                                metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock} = [metrics_mz.(mazeType{1}).errorRateDifference{trialInBlock}; NaN];
-                            end
-
-                            % Append proportionalError for the current trial
-                            metrics_mz.(mazeType{1}).normalizedTotalErrors{trialInBlock} = [metrics_mz.(mazeType{1}).normalizedTotalErrors{trialInBlock}; proportionalError];
-
-                            % Update prevError for the next iteration
-                            prevError = proportionalError;
-                        end
-                    end
+            elseif (do_AcrossSessionAnalysis_TurnVsStraightErrorRate)
+                % go through each trial in the set
+                for iTrial = 1:length(initialMazeData)
+                    mPath = initialMazeData{iTrial}.mazePath;
                 end
+
             end
 
         end
@@ -905,40 +874,9 @@ end
 disp('done, return'), return
 
 
-
-function metrics_mz = ExtractMetrics(mazeData, mazeType)
-
-% mazeData will contain the data from Maze1 or Maze1Repeat for each session
-
-if do_AcrossSessionAnalysis_SortedByMazeType
-    % If sorting/filtering by Maze Type, extract metrics accordingly.
-    % Assuming mazeTurnsLength first element can be used to distinguish types.
-    if mazeData.mazeTurnsLength(j,1) == someConditionForMazeType
-        metrics_mz = AppendMetrics(metrics_mz, mazeType, mazeData, j);
-    end
-    % Additional logic to handle different maze types can be added here.
-
-elseif do_AcrossSessionAnalysis_SortedBySession
-    % FILTERED BY RES INDEX
-    % If sorting/filtering by Session, you might need session-specific data
-    % which should be included in mazeData or handled externally.
-
-elseif do_AcrossSessionAnalysis_SortedByWeekday
-    % NEED TO FIND ALL SESSION WEEKDAYS {''}
-    % Similar to session, handling based on weekday.
-
-elseif (do_AcrossSessionAnalysis_LearningCurve || do_WithinSessionAnalysis)
-    % FILTERED BY THE TRIAL COUNT IN BLOCK
-    % If handling learning curves or within session analysis,
-    % it could be direct extraction without specific conditions.
-    metrics_mz = AppendMetrics(metrics_mz, mazeType, mazeData, j);
-end
-end
-
-
 function metrics_mz = AppendMetrics(metrics_mz, mazeType, mazeData, metricsIndex, mazeDataIndex)
 
-metrics_mz.(mazeType)   .normalizedTotalErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedTotalErrors{metricsIndex}, mazeData.totalErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
+metrics_mz.(mazeType).normalizedTotalErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedTotalErrors{metricsIndex}, mazeData.totalErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
 metrics_mz.(mazeType).normalizedDurations{metricsIndex} = [metrics_mz.(mazeType).normalizedDurations{metricsIndex}, mazeData.mazeDuration(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
 metrics_mz.(mazeType).normalizedRuleBreakingErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedRuleBreakingErrors{metricsIndex}, mazeData.ruleBreakingErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
 metrics_mz.(mazeType).normalizedRuleAbidingErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedRuleAbidingErrors{metricsIndex}, mazeData.ruleAbidingErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
@@ -958,5 +896,151 @@ for f = 1:length(fields)
     metrics_mz.Aggregate.(fieldName) = [metrics_mz.Maze1.(fieldName), metrics_mz.Maze1Repeat.(fieldName)];
 end
 end
+
+function errorTypes = determineSelectionError(selectedTiles, mPath)
+% Initialize
+errorTypes = strings(1, length(selectedTiles)); % Use string array for error types
+lastCorrectIndex = 0; % Last correct tile index in the path
+consecutiveErrors = 0; % Count of consecutive errors
+startedMaze = false; % Tracks if the start tile was correctly touched first
+lastErrorTile = ""; % Last tile that caused an error
+
+    function adjacent = isAdjacent(tile1, tile2)
+        % Helper function to convert chess coordinate to Cartesian coordinate
+
+        coord1 = getCartesian(tile1);
+        coord2 = getCartesian(tile2);
+
+        dx = abs(coord1(1) - coord2(1));
+        dy = abs(coord1(2) - coord2(2));
+
+        adjacent = (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+    end
+
+
+% Iterate over selected tiles
+for i = 1:length(selectedTiles)
+    tile = selectedTiles{i};
+    backTrackError = false;
+    retouchCurrentTilePositionError = false;
+    retouchCurrentTilePositionCorrect = false;
+    ruleAbidingError = false;
+    ruleBreakingError = false;
+    correctNextTileChoice = false;
+
+    % Check start condition
+    if ~startedMaze
+        if strcmp(tile, mPath{1})
+            startedMaze = true;
+            lastCorrectIndex = 1;
+            correctNextTileChoice = true;
+        else
+            ruleBreakingError = true;
+            consecutiveErrors = consecutiveErrors + 1;
+        end
+    else
+        if strcmp(tile, mPath{min(lastCorrectIndex + 1, length(mPath))}) && consecutiveErrors == 0
+            % Correct selection
+            lastCorrectIndex = min(lastCorrectIndex + 1, length(mPath)); % sets the newly selected tile as the last correct idx
+            correctNextTileChoice = true;
+            consecutiveErrors = 0; % Reset errors
+            lastErrorTile = ""; % Reset last error tile
+        elseif strcmp(tile, mPath{lastCorrectIndex})
+            % Retouching the last correct tile
+            if consecutiveErrors > 0
+                retouchCurrentTilePositionCorrect = true;
+                consecutiveErrors = 0; % Reset errors
+            else
+                retouchCurrentTilePositionError = true;
+            end
+        elseif isAdjacent(tile, mPath{lastCorrectIndex}) && ~any(strcmp(mPath(1:lastCorrectIndex), tile))
+            if(consecutiveErrors > 0 )
+                % Rule-breaking error: failed to return to last correct
+                % after an error
+                ruleBreakingError = true;
+                consecutiveErrors = consecutiveErrors + 1;
+            else
+                 % Rule-abiding error: adjacent but incorrect
+                ruleAbidingError = true;
+                consecutiveErrors = consecutiveErrors + 1;
+            end
+        elseif any(strcmp(mPath(1:lastCorrectIndex), tile))
+            backTrackError = true;            
+            consecutiveErrors = consecutiveErrors + 1;
+        else
+            % Rule-breaking error: not adjacent or repeating a previous error
+            ruleBreakingError = true;
+            consecutiveErrors = consecutiveErrors + 1;
+        end
+    end
+
+    % Determine error type
+    if ~isempty(lastErrorTile) && strcmp(lastErrorTile, tile) && ~correctNextTileChoice
+        % Perseverative errors
+        if backTrackError
+            errorTypes(i) = "perseverativeBackTrackError";
+        elseif retouchCurrentTilePositionError
+            errorTypes(i) = "perseverativeRetouchError";
+        elseif ruleAbidingError
+            errorTypes(i) = "perseverativeRuleAbidingError";
+        else
+            errorTypes(i) = "perseverativeRuleBreakingError";
+        end
+    else
+        if retouchCurrentTilePositionCorrect
+            errorTypes(i) = "retouchCorrect";
+        elseif correctNextTileChoice
+            errorTypes(i) = "correct";
+        elseif backTrackError
+            errorTypes(i) = "backTrackError";
+        elseif retouchCurrentTilePositionError
+            errorTypes(i) = "retouchError";
+        elseif ruleAbidingError
+            errorTypes(i) = "ruleAbidingError";
+        elseif ruleBreakingError
+            errorTypes(i) = "ruleBreakingError";
+        end
+    end
+
+    % Update lastErrorTile if there was an error
+     if ruleBreakingError || ruleAbidingError || backTrackError || retouchCurrentTilePositionError
+        lastErrorTile = tile;
+    end
+
+    % Adjust for start condition
+    if ~startedMaze
+        errorTypes(i) = "ruleBreakingError"; % Overwrite for failure to start correctly
+    end
+end
+end
+
+function turns = getTurnsAlongPath(mPath)
+turns = false(1, length(mPath));
+for i = 2:length(mPath)-1
+    turns(i) = checkIfTurn(mPath{i-1}, mPath{i}, mPath{i+1});
+end
+end
+
+function isTurn = checkIfTurn(tile1, tile2, tile3)
+    % Convert chess coordinates to Cartesian
+    [x1, y1] = getCartesian(tile1);
+    [x2, y2] = getCartesian(tile2);
+    [x3, y3] = getCartesian(tile3);
+
+    % Determine direction of movement
+    direction1 = [x2-x1, y2-y1];
+    direction2 = [x3-x2, y3-y2];
+
+    % A turn occurs if the direction changes
+    isTurn = ~isequal(direction1, direction2);
+end
+
+function [xCoord, yCoord] = getCartesian(coord)
+            alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            xCoord = find(alphabet == coord(1)); % MATLAB index starts at 1, so subtract 1
+            yCoord = str2double(coord(2)); % Convert second character to double for y-coordinate
+end
+
+
 
 
