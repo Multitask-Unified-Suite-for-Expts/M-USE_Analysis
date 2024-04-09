@@ -257,12 +257,15 @@ if do_AnalysisBasic == 1
             if isfield(res(i).data, 'Maze1Repeat') && ~isempty(fieldnames(res(i).data.Maze1Repeat))
                 allMazes = [allMazes; res(i).data.Maze1Repeat.mazeTurnsLength];
             end
+            if isfield(res(i).data, 'Maze2') && ~isempty(fieldnames(res(i).data.Maze2))
+                allMazes = [allMazes; res(i).data.Maze2.mazeTurnsLength];
+            end
         end
 
         uniqueMazeConfigurations = unique(allMazes, 'rows');
     end
 
-    if (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1 || do_AcrossSessionAnalysis_EarlyVsLate)
+    if (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1 || do_AcrossSessionAnalysis_EarlyVsLate || do_AcrossSessionAnalysis_TurnVsStraightErrorRate)
         allTrials= [];
         for i = 1:length(res)
             if isfield(res(i).data, 'Maze1') && ~isempty(fieldnames(res(i).data.Maze1))
@@ -301,28 +304,29 @@ if do_AnalysisBasic == 1
         metricsLength = size(uniqueTrialCounts, 1);
     elseif(do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1 )
         metrics = {'ruleBreakingErrors', 'ruleAbidingErrors', ...
-            'perseverativeErrors', 'retouchErrors'};
+            'perseverativeErrors', 'retouchErrors', 'backTrackErrors'};
     end
 
 
     % Initialize the structure
     metrics_mz = struct();
 
-    % Iterate through each maze type and metric to initialize arrays
-
-    for i = 1:length(mazeTypes)
-        mazeType = mazeTypes{i};
-        for j = 1:length(metrics)
-            metric = metrics{j};
-            if(do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1)
-                metrics_mz.(mazeType).turn.(metric) = {};
-                metrics_mz.(mazeType).straight.(metric) = {};
-
-            else
-                metrics_mz.(mazeType).(metric) = cell(metricsLength, 1);
-            end
+% Initialize the structure for 'turn' and 'straight' with NaN arrays
+for i = 1:length(mazeTypes)
+    mazeType = mazeTypes{i};
+    for j = 1:length(metrics)
+        metric = metrics{j};
+        if do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1
+            % Pre-allocate with NaNs, one row for each unique trial count
+            metrics_mz.(mazeType).turn.(metric) = cell(size(uniqueTrialCounts, 1), 1);
+            metrics_mz.(mazeType).straight.(metric) = cell(size(uniqueTrialCounts, 1), 1);
+        else
+            % Other initializations for different types of analysis
+            metrics_mz.(mazeType).(metric) = cell(metricsLength, 1);
         end
     end
+end
+
 
     if(do_WithinSessionAnalysis ==1 )
         SESSION_DATE = "03/18";
@@ -873,7 +877,7 @@ xCoord = find(alphabet == coord(1)); % MATLAB index starts at 1, so subtract 1
 yCoord = str2double(coord(2)); % Convert second character to double for y-coordinate
 end
 
-function metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesInTrial, pathType)
+function metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesInTrial, pathType, trialInBlock)
     ignoreErrors = false;
     tempErrorCounts = struct('ruleBreakingErrors', 0, ...
         'ruleAbidingErrors', 0, ...
@@ -909,21 +913,22 @@ function metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorType
     end
 
     % Now, append the processed error counts to metrics_mz using AppendSpatialErrors
-    metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, tempErrorCounts, pathType);
+    metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, tempErrorCounts, pathType, trialInBlock);
 end
-function metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, errorCounts, pathType)
-    % Assuming errorCounts is a struct similar to tempErrorCounts
+function metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, errorCounts, pathType, trialInBlock)
     fields = fieldnames(errorCounts);
+  
+
     for i = 1:numel(fields)
         fieldName = fields{i};
         currentCount = errorCounts.(fieldName);
-        if ~isfield(metrics_mz.(mazeType).(pathType), fieldName) || isempty(metrics_mz.(mazeType).(pathType).(fieldName))
-            metrics_mz.(mazeType).(pathType).(fieldName) = currentCount;
-        else
-            metrics_mz.(mazeType).(pathType).(fieldName)(end+1) = currentCount;
-        end
+            metrics_mz.(mazeType).(pathType).(fieldName){trialInBlock} = [metrics_mz.(mazeType).(pathType).(fieldName){trialInBlock}, currentCount];
+    
     end
 end
+
+
+
 
 function plot_AcrossSessionAnalysis_SortedByMazeType (metrics_mz, res)
 % Define fields to analyze
@@ -1276,51 +1281,52 @@ hold off;
 end
 
 
-function currentSessionData = AppendCurrentSessionData(trialData, currentSessionData, blockDef)
-for jj = 1:length(trialData)
-    if trialData(jj).AbortCode ~= 0
+function currentSessionData = AppendCurrentSessionData(currentTrialData, currentSessionData, blockDef)
+iT = 0;
+for jj = 1:length(currentTrialData)
+    if currentTrialData(jj).AbortCode ~= 0
         continue; % Skip to the next iteration of the loop
     end
-
-    mazeStruct = jsondecode(blockDef(trialData(jj).BlockCount).MazeDef);
+    iT = iT + 1;
+    mazeStruct = jsondecode(blockDef(currentTrialData(jj).BlockCount).MazeDef);
 
     nTurns = mazeStruct.mNumTurns;
     mLength = mazeStruct.mNumSquares;
 
-    currentSessionData.subjectName{jj} = trialData(jj).SubjectID;%  trialData(iT).SubjectNum;
-    currentSessionData.dayOfTheWeek(jj) = day(currentSessionData.sessionDatesFormatted, "longname");
-    currentSessionData.mazeDefName{jj} = mazeStruct.mName;
-    currentSessionData.mazePath{jj} = mazeStruct.mPath;
+    currentSessionData.subjectName{iT} = currentTrialData(jj).SubjectID;%  trialData(iT).SubjectNum;
+    currentSessionData.dayOfTheWeek(iT) = day(currentSessionData.sessionDatesFormatted, "longname");
+    currentSessionData.mazeDefName{iT} = mazeStruct.mName;
+    currentSessionData.mazePath{iT} = mazeStruct.mPath;
 
 
-    currentSessionData.mazeTurnsLength(jj,1:2) = [nTurns, mLength];
-    currentSessionData.blockNum(jj) = trialData(jj).BlockCount;
-    currentSessionData.blockName(jj) = {blockDef(trialData(jj).BlockCount).BlockName};
+    currentSessionData.mazeTurnsLength(iT,1:2) = [nTurns, mLength];
+    currentSessionData.blockNum(iT) = currentTrialData(jj).BlockCount;
+    currentSessionData.blockName(iT) = {blockDef(currentTrialData(jj).BlockCount).BlockName};
 
-    currentSessionData.trialInBlock(jj) = trialData(jj).TrialCount_InBlock;
-    currentSessionData.mazeDuration(jj) = trialData(jj).MazeDuration;
-    currentSessionData.sliderBarFilled(jj) = strcmp(trialData(jj).SliderBarFilled,'True');
-    currentSessionData.totalErrors(jj) = trialData(jj).TotalErrors;
-    currentSessionData.selectedTiles{jj} = strsplit(trialData(jj).SelectedTiles, ',');
-    currentSessionData.errorTypes{jj} = determineSelectionError( currentSessionData.selectedTiles{jj}, mazeStruct.mPath);
-    currentSessionData.correctTouches(jj) = trialData(jj).CorrectTouches;
-    currentSessionData.retouchCorrect(jj) = trialData(jj).RetouchCorrect;
-    currentSessionData.retouchErroneous(jj) = trialData(jj).RetouchErroneous;
-    currentSessionData.backTrackingErrors(jj) = trialData(jj).BacktrackingErrors;
-    currentSessionData.ruleAbidingErrors(jj) = trialData(jj).Rule_AbidingErrors;
-    currentSessionData.ruleBreakingErrors(jj) = trialData(jj).Rule_BreakingErrors;
-    currentSessionData.perseverativeRetouchErroneous(jj) = trialData(jj).PerseverativeRetouchErrors;
-    currentSessionData.perseverativeBackTrackingErrors(jj) = trialData(jj).PerseverativeBackTrackErrors;
-    currentSessionData.perseverativeRuleAbidingErrors(jj) = trialData(jj).PerseverativeRuleAbidingErrors;
-    currentSessionData.perseverativeRuleBreakingErrors(jj) = trialData(jj).PerseverativeRuleBreakingErrors;
+    currentSessionData.trialInBlock(iT) = currentTrialData(jj).TrialCount_InBlock;
+    currentSessionData.mazeDuration(iT) = currentTrialData(jj).MazeDuration;
+    currentSessionData.sliderBarFilled(iT) = strcmp(currentTrialData(jj).SliderBarFilled,'True');
+    currentSessionData.totalErrors(iT) = currentTrialData(jj).TotalErrors;
+    currentSessionData.selectedTiles{iT} = strsplit(currentTrialData(jj).SelectedTiles, ',');
+    currentSessionData.errorTypes{iT} = determineSelectionError( currentSessionData.selectedTiles{iT}, mazeStruct.mPath);
+    currentSessionData.correctTouches(iT) = currentTrialData(jj).CorrectTouches;
+    currentSessionData.retouchCorrect(iT) = currentTrialData(jj).RetouchCorrect;
+    currentSessionData.retouchErroneous(iT) = currentTrialData(jj).RetouchErroneous;
+    currentSessionData.backTrackingErrors(iT) = currentTrialData(jj).BacktrackingErrors;
+    currentSessionData.ruleAbidingErrors(iT) = currentTrialData(jj).Rule_AbidingErrors;
+    currentSessionData.ruleBreakingErrors(iT) = currentTrialData(jj).Rule_BreakingErrors;
+    currentSessionData.perseverativeRetouchErroneous(iT) = currentTrialData(jj).PerseverativeRetouchErrors;
+    currentSessionData.perseverativeBackTrackingErrors(iT) = currentTrialData(jj).PerseverativeBackTrackErrors;
+    currentSessionData.perseverativeRuleAbidingErrors(iT) = currentTrialData(jj).PerseverativeRuleAbidingErrors;
+    currentSessionData.perseverativeRuleBreakingErrors(iT) = currentTrialData(jj).PerseverativeRuleBreakingErrors;
 
 end
 end
-function metrics_mz = ProcessMazeTurnData(metrics_mz, mazeData, mazeType)
-    for iTrial = 1:length(mazeData)
-        mPath = mazeData.mazePath{iTrial};
+function metrics_mz = ProcessMazeTurnData(metrics_mz, currentMazedata, mazeType)
+    for iTrial = 1:length(currentMazedata.trialInBlock)
+        mPath = currentMazedata.mazePath{iTrial};
         turns = find(getTurnsAlongPath(mPath)) + 1;
-        errorTypesInTrial = mazeData.errorTypes{iTrial};
+        errorTypesInTrial = currentMazedata.errorTypes{iTrial};
         pathProgress = find(strcmp(errorTypesInTrial, 'correct'));
 
         if length(pathProgress) < 3
@@ -1340,8 +1346,9 @@ function metrics_mz = ProcessMazeTurnData(metrics_mz, mazeData, mazeType)
             else
                 pathType = 'straight'; 
             end
-
-            metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesDuringSelection, pathType);
+            
+            trialInBlock = currentMazedata.trialInBlock(iTrial);
+            metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesDuringSelection, pathType, trialInBlock);
             startIndex = pathProgress(iTile) + 1;  % Update startIndex for the next set of errors
         end
     end

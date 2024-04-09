@@ -23,7 +23,7 @@
 %    at http://www.gnu.org/licenses/
 
 
-do_LoadData = 0;
+do_LoadData = 1;
 do_AnalysisBasic = 1;
 do_AnalysisBasicPlot = 1;
 do_AcrossSessionAnalysis_SortedByMazeType = 0;
@@ -257,12 +257,15 @@ if do_AnalysisBasic == 1
             if isfield(res(i).data, 'Maze1Repeat') && ~isempty(fieldnames(res(i).data.Maze1Repeat))
                 allMazes = [allMazes; res(i).data.Maze1Repeat.mazeTurnsLength];
             end
+            if isfield(res(i).data, 'Maze2') && ~isempty(fieldnames(res(i).data.Maze2))
+                allMazes = [allMazes; res(i).data.Maze2.mazeTurnsLength];
+            end
         end
 
         uniqueMazeConfigurations = unique(allMazes, 'rows');
     end
 
-    if (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1 || do_AcrossSessionAnalysis_EarlyVsLate)
+    if (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1 || do_AcrossSessionAnalysis_EarlyVsLate || do_AcrossSessionAnalysis_TurnVsStraightErrorRate)
         allTrials= [];
         for i = 1:length(res)
             if isfield(res(i).data, 'Maze1') && ~isempty(fieldnames(res(i).data.Maze1))
@@ -308,21 +311,22 @@ if do_AnalysisBasic == 1
     % Initialize the structure
     metrics_mz = struct();
 
-    % Iterate through each maze type and metric to initialize arrays
-
-    for i = 1:length(mazeTypes)
-        mazeType = mazeTypes{i};
-        for j = 1:length(metrics)
-            metric = metrics{j};
-            if(do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1)
-                metrics_mz.(mazeType).turn.(metric) = {};
-                metrics_mz.(mazeType).straight.(metric) = {};
-
-            else
-                metrics_mz.(mazeType).(metric) = cell(metricsLength, 1);
-            end
+% Initialize the structure for 'turn' and 'straight' with NaN arrays
+for i = 1:length(mazeTypes)
+    mazeType = mazeTypes{i};
+    for j = 1:length(metrics)
+        metric = metrics{j};
+        if do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1
+            % Pre-allocate with NaNs, one row for each unique trial count
+            metrics_mz.(mazeType).turn.(metric) = nan(size(uniqueTrialCounts, 1), 1);
+            metrics_mz.(mazeType).straight.(metric) = nan(size(uniqueTrialCounts, 1), 1);
+        else
+            % Other initializations for different types of analysis
+            metrics_mz.(mazeType).(metric) = cell(metricsLength, 1);
         end
     end
+end
+
 
     if(do_WithinSessionAnalysis ==1 )
         SESSION_DATE = "03/18";
@@ -873,7 +877,7 @@ xCoord = find(alphabet == coord(1)); % MATLAB index starts at 1, so subtract 1
 yCoord = str2double(coord(2)); % Convert second character to double for y-coordinate
 end
 
-function metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesInTrial, pathType)
+function metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesInTrial, pathType, trialInBlock)
     ignoreErrors = false;
     tempErrorCounts = struct('ruleBreakingErrors', 0, ...
         'ruleAbidingErrors', 0, ...
@@ -909,21 +913,21 @@ function metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorType
     end
 
     % Now, append the processed error counts to metrics_mz using AppendSpatialErrors
-    metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, tempErrorCounts, pathType);
+    metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, tempErrorCounts, pathType, trialInBlock);
 end
-function metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, errorCounts, pathType)
-    % Assuming errorCounts is a struct similar to tempErrorCounts
+function metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, errorCounts, pathType, trialInBlock)
     fields = fieldnames(errorCounts);
+  
+
     for i = 1:numel(fields)
         fieldName = fields{i};
         currentCount = errorCounts.(fieldName);
-        if ~isfield(metrics_mz.(mazeType).(pathType), fieldName) || isempty(metrics_mz.(mazeType).(pathType).(fieldName))
-            metrics_mz.(mazeType).(pathType).(fieldName) = currentCount;
-        else
-            metrics_mz.(mazeType).(pathType).(fieldName)(end+1) = currentCount;
-        end
+        metrics_mz.(mazeType).(pathType).(fieldName)(trialInBlock) = currentCount;
     end
 end
+
+
+
 
 function plot_AcrossSessionAnalysis_SortedByMazeType (metrics_mz, res)
 % Define fields to analyze
@@ -1276,8 +1280,8 @@ hold off;
 end
 
 
-function currentSessionData = AppendCurrentSessionData(trialData, currentSessionData, blockDef)
-for jj = 1:length(trialData)
+function currentSessionData = AppendCurrentSessionData(currentTrialData, currentSessionData, blockDef)
+for jj = 1:length(currentTrialData)
     if trialData(jj).AbortCode ~= 0
         continue; % Skip to the next iteration of the loop
     end
@@ -1319,16 +1323,16 @@ end
 function metrics_mz = ProcessMazeTurnData(metrics_mz, mazeData, mazeType)
     for iTrial = 1:length(mazeData)
         mPath = mazeData.mazePath{iTrial};
-        turns = find(getTurnsAlongPath(mPath));
+        turns = find(getTurnsAlongPath(mPath)) + 1;
         errorTypesInTrial = mazeData.errorTypes{iTrial};
         pathProgress = find(strcmp(errorTypesInTrial, 'correct'));
 
-        if length(pathProgress) < 2
-            continue;  % Need at least two 'correct' to define a path segment
+        if length(pathProgress) < 3
+            continue;  % Need at least two 'correct' to define a path segment 
         end
 
-        startIndex = pathProgress(1) + 1;  % Initial error checking starts after the first correct
-        for iTile = 2:length(pathProgress)
+        startIndex = pathProgress(2) + 1;  % Initial error checking starts after the first correct
+        for iTile = 3:length(pathProgress)
             if iTile > length(mPath) || pathProgress(iTile) > length(errorTypesInTrial)
                 break;  % Avoid indexing beyond the bounds
             end
@@ -1340,8 +1344,9 @@ function metrics_mz = ProcessMazeTurnData(metrics_mz, mazeData, mazeType)
             else
                 pathType = 'straight'; 
             end
-
-            metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesDuringSelection, pathType);
+            
+            trialInBlock = mazeData.trialInBlock(iTrial);
+            metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesDuringSelection, pathType, trialInBlock);
             startIndex = pathProgress(iTile) + 1;  % Update startIndex for the next set of errors
         end
     end
