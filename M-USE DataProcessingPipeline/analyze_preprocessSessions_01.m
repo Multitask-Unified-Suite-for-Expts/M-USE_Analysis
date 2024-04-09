@@ -25,11 +25,14 @@
 % ---
 
 % SessionSets = {'Frey-1' };
-  %SessionSets = {'Frey-2' }; % ok, finished - last run Jan 29
+  % SessionSets = {'Frey-2' }; % ok, finished - last run Jan 29
 % SessionSets = {'Frey-3' }; % new since jan 2024 - last run Jan 29
+ % SessionSets = {'Frey-4' }; % ongoing since march 26
+
 
 % SessionSets = {'Wotan-1' };
- SessionSets = {'Wotan-2' }; %ongoing since august 2023 - last run Jan 29
+ % SessionSets = {'Wotan-2' }; %ongoing since august 2023 - last run Jan 29
+   SessionSets = {'Wotan-3' }; %ongoing since march 26
 
 
 % SessionSets = {'Jotun-1' }; Training
@@ -65,6 +68,11 @@ elseif strcmp(SessionSets{iO},'Frey-3')
         Subject = 'Frey';
         FOLDER_DATA = '/Volumes/Womelsdorf Lab/DATA_kiosk/Frey/MRT_FL_VS_WM';
         RESULT_FOLDER = [pwd filesep 'MUSEMAT01_MRT_FL_VS_WM_Frey']; if ~exist(RESULT_FOLDER), mkdir(RESULT_FOLDER), end
+elseif strcmp(SessionSets{iO},'Frey-4')
+        EXP_ID = 'WM_EC_MG';
+        Subject = 'Frey';
+        FOLDER_DATA = '/Volumes/Womelsdorf Lab/DATA_kiosk/Frey/WM_EC_MG';
+        RESULT_FOLDER = [pwd filesep 'MUSEMAT01_WM_EC_MG_Frey']; if ~exist(RESULT_FOLDER), mkdir(RESULT_FOLDER), end
 
     elseif strcmp(SessionSets{iO},'Wotan-1')
         EXP_ID = 'VS_EC_FL_MRT';
@@ -85,6 +93,11 @@ elseif strcmp(SessionSets{iO},'Frey-3')
         % FOLDER_SESSION{iSession}  = 'Session_08_17_23__09_53_45_Wotan'; % new FL blocksequence (60% EDsame/IDsame) blocks
         % FOLDER_SESSION{iSession}  = 'Session_08_25_23__08_35_30_Wotan'; % new FL blocksequence (60% EDsame/IDsame) blocks
         % --- collect mat files
+    elseif strcmp(SessionSets{iO},'Wotan-3')
+        Subject = 'Wotan';
+        FOLDER_DATA = '/Volumes/Womelsdorf Lab/DATA_kiosk/Wotan/WM_EC_MG';
+        EXP_ID = 'WM_EC_MG';
+        RESULT_FOLDER = [pwd filesep 'MUSEMAT01_WM_EC_MG_Wotan']; if ~exist(RESULT_FOLDER), mkdir(RESULT_FOLDER), end
     elseif strcmp(SessionSets{iO},'Jotun-1')
         EXP_ID = 'VS_FL';
         Subject = 'Jotun';
@@ -137,7 +150,7 @@ elseif strcmp(SessionSets{iO},'Frey-3')
     % --- --- --- --- --- --- ---
     % --- determine which sessions to analyze
     % --- --- --- --- --- --- ---
-    for iSession = 56:85 % EDITED FOR SESSION FROM 2/8 TO 3/21
+    for iSession = 1:length(FOLDER_SESSION) % EDITED FOR SESSION FROM 2/8 TO 3/21
         iSessionName = FOLDER_SESSION{iSession};
         iSessionDataFolder = [ FOLDER_DATA  filesep  iSessionName ];
         iResultFile = ['DAT01_' Subject '_' EXP_ID '_' iSessionName];
@@ -213,7 +226,7 @@ elseif strcmp(SessionSets{iO},'Frey-3')
                 GotData=1;
             end
 
-            if doReadFrameData == 1 & exist([preFixFolder  'FrameData'])~=0
+            if doReadFrameData == 1 & exist([preFixFolder  'FrameData.mat'])
                 in = load([preFixFolder   'FrameData']);
                 dat.frameData{iT}  = table2struct(in.frameData);
             end
