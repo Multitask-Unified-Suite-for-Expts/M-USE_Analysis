@@ -23,16 +23,17 @@
 %    at http://www.gnu.org/licenses/
 
 
-do_LoadData = 0;
+do_LoadData = 1;
 do_AnalysisBasic = 1;
 do_AnalysisBasicPlot = 1;
 do_AcrossSessionAnalysis_SortedByMazeType = 0;
 do_AcrossSessionAnalysis_SortedBySession = 0;
 do_AcrossSessionAnalysis_SortedByWeekday = 0;
-do_AcrossSessionAnalysis_LearningCurve = 0;
-do_AcrossSessionAnalysis_TurnVsStraightErrorRate = 1;
+do_AcrossSessionAnalysis_LearningCurve = 1;
+do_AcrossSessionAnalysis_TurnVsStraightErrorRate = 0;
+do_AcrossSessionAnalysis_TowardsVsAwayEndTile = 0;
 do_AcrossSessionAnalysis_EarlyVsLate = 0;
-do_AcrossSessionAnalysis_AwayVsTowardEndTile = 0;
+do_AcrossSessionAnalysis_ReactionTimes = 0;
 
 do_WithinSessionAnalysis = 0; % NEEDS TO BE UPDATED
 
@@ -40,10 +41,10 @@ DO_SAVEFIGURES = 0;
 
 PLOT_INDIVIDUALSESSIONS = 0;
 
-MIN_TURNS = 4; % NEEDS TO BE UPDATED, SET TO 0 TO IGNORE TRIAL DATA FILTERING
-MIN_LENGTH = 14; % NEEDS TO BE UPDATED
-MAX_TURNS = 0;
-MAX_LENGTH = 0;
+% MIN_TURNS = 4; % NEEDS TO BE UPDATED, SET TO 0 TO IGNORE TRIAL DATA FILTERING
+% MIN_LENGTH = 14; % NEEDS TO BE UPDATED
+% MAX_TURNS = 0;
+% MAX_LENGTH = 0;
 
 % --- --- --- --- --- --- --- ---
 % --- folder with preprocecced data
@@ -55,8 +56,8 @@ MUSEMATFOLDERNames = {}; iResultFolder = ''; iResultFile = '';
 % SessionID_MZ = {'Frey_MZ_all_01'};
 % SessionID_MZ = {'Wotan_MZ_all_01'};
 
-% SessionID_MZ = {'Frey_MZ_all_02'};
-SessionID_MZ = {'Wotan_MZ_all_02'};
+   SessionID_MZ = {'Frey_MZ_all_02'};
+   % SessionID_MZ = {'Wotan_MZ_all_02'};
 
 % MUSEMATFOLDERNames = 'MUSEMAT01_VS_EC_FL_MZG_Frey'
 switch SessionID_MZ{1}
@@ -265,7 +266,7 @@ if do_AnalysisBasic == 1
         uniqueMazeConfigurations = unique(allMazes, 'rows');
     end
 
-    if (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1 || do_AcrossSessionAnalysis_EarlyVsLate || do_AcrossSessionAnalysis_TurnVsStraightErrorRate)
+    if (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1 || do_AcrossSessionAnalysis_EarlyVsLate || do_AcrossSessionAnalysis_TurnVsStraightErrorRate || do_AcrossSessionAnalysis_TowardsVsAwayEndTile || do_AcrossSessionAnalysis_ReactionTimes)
         allTrials= [];
         for i = 1:length(res)
             if isfield(res(i).data, 'Maze1') && ~isempty(fieldnames(res(i).data.Maze1))
@@ -286,7 +287,7 @@ if do_AnalysisBasic == 1
     % Initialize the empty arrays to store data for the respective analysis
     % type
     mazeTypes = {'Maze1', 'Maze2', 'Maze1Repeat', 'Aggregate'};
-    standardMetrics = {'normalizedTotalErrors', 'normalizedDurations', ...
+    standardMetrics = {'normalizedTotalErrors', 'normalizedMazeDurations', ...
         'normalizedRuleBreakingErrors', 'normalizedRuleAbidingErrors', ...
         'normalizedPerseverativeErrors'};
 
@@ -302,30 +303,40 @@ if do_AnalysisBasic == 1
     elseif (do_AcrossSessionAnalysis_LearningCurve == 1 || do_WithinSessionAnalysis == 1 || do_AcrossSessionAnalysis_EarlyVsLate)
         metrics = [standardMetrics, {'trialInBlock'}];
         metricsLength = size(uniqueTrialCounts, 1);
-    elseif(do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1 )
+    elseif(do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1 || do_AcrossSessionAnalysis_TowardsVsAwayEndTile)
         metrics = {'ruleBreakingErrors', 'ruleAbidingErrors', ...
             'perseverativeErrors', 'retouchErrors', 'backTrackErrors'};
+    elseif (do_AcrossSessionAnalysis_ReactionTimes == 1)
+        metrics = {'correctToCorrect', 'correctToError', ...
+            'errorToRetouch', 'retouchToCorrect', 'retouchToError', 'errorToError'};
+        metricsLength = 1;
     end
 
 
     % Initialize the structure
     metrics_mz = struct();
 
-% Initialize the structure for 'turn' and 'straight' with NaN arrays
-for i = 1:length(mazeTypes)
-    mazeType = mazeTypes{i};
-    for j = 1:length(metrics)
-        metric = metrics{j};
-        if do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1
-            % Pre-allocate with NaNs, one row for each unique trial count
-            metrics_mz.(mazeType).turn.(metric) = cell(size(uniqueTrialCounts, 1), 1);
-            metrics_mz.(mazeType).straight.(metric) = cell(size(uniqueTrialCounts, 1), 1);
-        else
-            % Other initializations for different types of analysis
-            metrics_mz.(mazeType).(metric) = cell(metricsLength, 1);
+    % Initialize the structure for 'turn' and 'straight' with NaN arrays
+    for i = 1:length(mazeTypes)
+        mazeType = mazeTypes{i};
+        for j = 1:length(metrics)
+            metric = metrics{j};
+            if (do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1 || do_AcrossSessionAnalysis_TowardsVsAwayEndTile == 1)
+                if do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1
+                    % Pre-allocate with NaNs, one row for each unique trial count
+                    metrics_mz.(mazeType).turn.(metric) = cell(size(uniqueTrialCounts, 1), 1);
+                    metrics_mz.(mazeType).straight.(metric) = cell(size(uniqueTrialCounts, 1), 1);
+                end
+                if do_AcrossSessionAnalysis_TowardsVsAwayEndTile == 1
+                    metrics_mz.(mazeType).towards.(metric) = cell(size(uniqueTrialCounts, 1), 1);
+                    metrics_mz.(mazeType).away.(metric) = cell(size(uniqueTrialCounts, 1), 1);
+                end
+            else
+                % Other initializations for different types of analysis
+                metrics_mz.(mazeType).(metric) = cell(metricsLength, 1);
+            end
         end
     end
-end
 
 
     if(do_WithinSessionAnalysis ==1 )
@@ -418,53 +429,20 @@ end
                 metrics_mz.Maze2.trialInBlock = num2cell(1:uniqueTrialCounts(end));
 
 
-            elseif (do_AcrossSessionAnalysis_TurnVsStraightErrorRate)
+            elseif (do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1 || do_AcrossSessionAnalysis_TowardsVsAwayEndTile == 1)
                 % Process each maze data set
-                metrics_mz = ProcessMazeTurnData(metrics_mz, maze1Data, 'Maze1');
-                metrics_mz = ProcessMazeTurnData(metrics_mz, repeatMaze1Data, 'Maze1Repeat');
-                metrics_mz = ProcessMazeTurnData(metrics_mz, maze2Data, 'Maze2');
+                metrics_mz = ProcessSpatialMazeData(metrics_mz, maze1Data, 'Maze1', do_AcrossSessionAnalysis_TurnVsStraightErrorRate, do_AcrossSessionAnalysis_TowardsVsAwayEndTile);
+                metrics_mz = ProcessSpatialMazeData(metrics_mz, repeatMaze1Data, 'Maze1Repeat', do_AcrossSessionAnalysis_TurnVsStraightErrorRate, do_AcrossSessionAnalysis_TowardsVsAwayEndTile);
+                metrics_mz = ProcessSpatialMazeData(metrics_mz, maze2Data, 'Maze2', do_AcrossSessionAnalysis_TurnVsStraightErrorRate,do_AcrossSessionAnalysis_TowardsVsAwayEndTile);
 
 
-            elseif(do_AcrossSessionAnalysis_AwayVsTowardEndTile == 1)
-                mazeTypes = {maze1Data, repeatMaze1Data, maze2Data}; % Assuming these are tables or similar structured data.
-
-                for iType = 1:length(mazeTypes)
-                    currentMazeData = mazeTypes{iType}; % This extracts the table (or data structure) from the cell array
-
-                    % Now, you iterate through each trial of the current maze data
-                    % Make sure currentMazeData is a table for height() to work. If it's an array or cell array, use length().
-                    for iTrial = 1:height(currentMazeData)
-
-                        mPath = currentMazeData.mazePath{iTrial};
-                        endTile = mPath{end}; % Last element in mazePath is the end tile
-                        selectedTiles = currentMazeData.selectedTiles{iTrial}; % Assuming this exists
-                        errorTypesInTrial = currentMazeData.errorTypes{iTrial}; % Assuming this exists
-
-
-                        if length(selectedTiles) < 2
-                            continue; % Skip if fewer than two selections
-                        end
-
-                        % Starting from the second selection to check direction
-                        for iTile = 2:length(selectedTiles)
-                            if iTile > length(mPath) || iTile > length(errorTypesInTrial)
-                                break; % Guard against out-of-bounds indexing
-                            end
-
-                            currentTile = selectedTiles{iTile-1};
-                            nextTile = selectedTiles{iTile};
-
-                            % Determine if moving towards or away from the end
-                            if isMovingTowardsEnd(currentTile, nextTile, endTile)
-                                directionType = 'towards';
-                            else
-                                directionType = 'away';
-                            end
-
-                            % Record the errors for the current selection
-                            metrics_mz = AppendSpatialErrors(metrics_mz, currentMazeData, errorTypesInTrial{iTile-1}, directionType);
-                        end
-                    end
+            elseif ( do_AcrossSessionAnalysis_ReactionTimes == 1)
+                if(~isfield(maze1Data, 'reactionTimes'))
+                    continue;
+                else
+                    metrics_mz = ProcessReactionTimeData(metrics_mz, maze1Data, 'Maze1');
+                    metrics_mz = ProcessReactionTimeData(metrics_mz, repeatMaze1Data, 'Maze1Repeat');
+                    metrics_mz = ProcessReactionTimeData(metrics_mz, maze2Data, 'Maze2');
                 end
 
             end
@@ -478,7 +456,7 @@ end
 
 end
 
-
+% % % 
 if do_AnalysisBasicPlot == 1
 
     % --- --- --- --- --- --- --- --- --- --- ---
@@ -515,8 +493,16 @@ if do_AnalysisBasicPlot == 1
         plot_AcrossSessionAnalysis_TurnVsStraightErrorRate(metrics_mz, res);
     end
 
+    if(do_AcrossSessionAnalysis_TowardsVsAwayEndTile == 1)
+        plot_AcrossSessionAnalysis_TowardsVsAway(metrics_mz, res);
+    end
+
     if(do_AcrossSessionAnalysis_EarlyVsLate == 1)
         plot_AcrossSessionAnalysis_EarlyVsLate(metrics_mz, res);
+    end
+
+    if(do_AcrossSessionAnalysis_ReactionTimes == 1)
+        plot_AcrossSessionAnalysis_ReactionTimes(metrics_mz, res);
     end
 
 
@@ -636,7 +622,7 @@ disp('done, return'), return
 function metrics_mz = AppendMetrics(metrics_mz, mazeType, mazeData, metricsIndex, mazeDataIndex)
 
 metrics_mz.(mazeType).normalizedTotalErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedTotalErrors{metricsIndex}, mazeData.totalErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
-metrics_mz.(mazeType).normalizedDurations{metricsIndex} = [metrics_mz.(mazeType).normalizedDurations{metricsIndex}, mazeData.mazeDuration(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
+metrics_mz.(mazeType).normalizedMazeDurations{metricsIndex} = [metrics_mz.(mazeType).normalizedMazeDurations{metricsIndex}, mazeData.mazeDuration(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
 metrics_mz.(mazeType).normalizedRuleBreakingErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedRuleBreakingErrors{metricsIndex}, mazeData.ruleBreakingErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
 metrics_mz.(mazeType).normalizedRuleAbidingErrors{metricsIndex} = [metrics_mz.(mazeType).normalizedRuleAbidingErrors{metricsIndex}, mazeData.ruleAbidingErrors(mazeDataIndex) ./ mazeData.mazeTurnsLength(mazeDataIndex,2)'];
 
@@ -649,49 +635,91 @@ metrics_mz.(mazeType).normalizedPerseverativeErrors{metricsIndex} = [metrics_mz.
 end
 
 function metrics_mz = AggregateMetrics(metrics_mz)
-% Get the field names of the metrics in Maze1
+% Iterate through each field name in Maze1
 fields = fieldnames(metrics_mz.Maze1);
 
-% Iterate through each field name
 for f = 1:length(fields)
     fieldName = fields{f};
+    % Initialize a cell to hold the aggregated data
+    aggregatedData = {};
+
+    % Aggregate data from Maze1, Maze1Repeat, and optionally Maze2
+    % Check if the field is a struct (has subfields)
     if isstruct(metrics_mz.Maze1.(fieldName))
-        subfield = fieldnames(metrics_mz.Maze1.(fieldName));
-        for sf = 1:length(subfield)
-            subfieldName = subfield{sf};
-            metrics_mz.Aggregate.(fieldName).(subfieldName) = [metrics_mz.Maze1.(fieldName).(subfieldName), metrics_mz.Maze1Repeat.(fieldName).(subfieldName)];
+        % Iterate through subfields if present
+        subfields = fieldnames(metrics_mz.Maze1.(fieldName));
+        for sf = 1:length(subfields)
+            subfieldName = subfields{sf};
+            % Aggregate subfield data from Maze1, Maze1Repeat, and optionally Maze2
+            aggregatedData = aggregateField(metrics_mz, fieldName, subfieldName);
+            % Assign the aggregated data for the subfield
+            metrics_mz.Aggregate.(fieldName).(subfieldName) = aggregatedData;
         end
     else
-        % Retrieve the cell arrays for the current field from Maze1 and Maze1Repeat
-        dataMaze1 = metrics_mz.Maze1.(fieldName);
-        if isfield(metrics_mz, 'Maze1Repeat')
-            dataMaze1Repeat = metrics_mz.Maze1Repeat.(fieldName);
-        end
-        if isfield(metrics_mz, 'Maze2')
-            dataMaze2 = metrics_mz.Maze2.(fieldName);
-        end
-        % Initialize a new cell array for the aggregated data
-        aggregatedData = cell(size(dataMaze1));
-
-        % Check if both fields contain cell arrays of the same size
-        if length(dataMaze1) == length(dataMaze1Repeat)
-            % Iterate through each row of the cell array
-            for row = 1:length(dataMaze1)
-                if isfield(metrics_mz, 'Maze2')
-                    aggregatedData{row} = [dataMaze1{row}, dataMaze1Repeat{row}, dataMaze2{row}];
-                else
-                    aggregatedData{row} = [dataMaze1{row}, dataMaze1Repeat{row}];
-                end
-            end
-        else
-            error('The number of rows in Maze1 and Maze1Repeat do not match for field %s.', fieldName);
-        end
-
-        % Assign the aggregated data back to the Aggregate field for the current fieldName
+        % Directly aggregate data for fields without subfields
+        aggregatedData = aggregateField(metrics_mz, fieldName);
+        % Assign the aggregated data
         metrics_mz.Aggregate.(fieldName) = aggregatedData;
     end
 end
 end
+
+% Helper function to aggregate data
+function aggregatedData = aggregateField(metrics_mz, fieldName, subfieldName)
+aggregatedData = {};
+mazes = {'Maze1', 'Maze1Repeat', 'Maze2'};
+data = {};
+
+% Collect data from each Maze, if available
+for m = 1:length(mazes)
+    mazeName = mazes{m};
+    if isfield(metrics_mz, mazeName)
+        if nargin == 3 % Subfield present
+            if isfield(metrics_mz.(mazeName).(fieldName), subfieldName)
+                data{end+1} = metrics_mz.(mazeName).(fieldName).(subfieldName);
+            end
+        else
+            if isfield(metrics_mz.(mazeName), fieldName)
+                data{end+1} = metrics_mz.(mazeName).(fieldName);
+            end
+        end
+    end
+end
+
+if ~isempty(data) && all(cellfun(@(x) isequal(size(x), size(data{1})), data))
+    if iscell(data{1})
+        % Number of rows in any of the cell arrays
+        numRows = size(data{1}, 1);
+
+        % Pre-allocate the aggregatedData cell array
+        aggregatedData = cell(numRows, 1);
+
+        % Loop over each row
+        for i = 1:numRows
+            % Extract the i-th element from each cell array and concatenate them
+            aggregatedRow = cellfun(@(x) x{i}, data, 'UniformOutput', false);
+            aggregatedData{i} = horzcat(aggregatedRow{:});
+        end
+    else
+        % For numerical arrays, concatenate directly
+        aggregatedData = horzcat(data{:});
+    end
+else
+    numCols = size(data, 2);
+
+    % Loop over each row
+    for i = 1:numCols
+        aggregatedData = [aggregatedData, data{i}];
+    end
+
+end
+
+if(isempty(aggregatedData))
+    error('Data size mismatch or empty data.');
+
+end
+end
+
 
 %
 % function metrics_mz = AggregateMetrics(metrics_mz)
@@ -714,26 +742,30 @@ end
 % end
 % end
 
+function adjacent = isAdjacent(tile1, tile2)
+% Helper function to convert chess coordinate to Cartesian coordinate
 
-function errorTypes = determineSelectionError(selectedTiles, mPath)
+[x1, y1] = getCartesian(tile1);
+[x2, y2] = getCartesian(tile2);
+
+dx = abs(x1 - x2);
+dy = abs(y1 - y2);
+
+adjacent = (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+end
+
+function [errorTypes, tileSpecificErrorCounts] = determineSelectionError(selectedTiles, mPath)
 % Initialize
 errorTypes = strings(1, length(selectedTiles)); % Use string array for error types
-lastCorrectIndex = 0; % Last correct tile index in the path
+lastCorrectIndex = 1; % Last correct tile index in the path
 consecutiveErrors = 0; % Count of consecutive errors
 startedMaze = false; % Tracks if the start tile was correctly touched first
 lastErrorTile = ""; % Last tile that caused an error
 
-    function adjacent = isAdjacent(tile1, tile2)
-        % Helper function to convert chess coordinate to Cartesian coordinate
+tileSpecificErrorCounts = struct("ruleBreakingErrors", zeros(6,6),"ruleAbidingErrors", zeros(6,6),"backTrackErrors", zeros(6,6),"retouchErrors", zeros(6,6), "perseverativeErrors", zeros(6,6));
 
-        [x1, y1] = getCartesian(tile1);
-        [x2, y2] = getCartesian(tile2);
-
-        dx = abs(x1 - x2);
-        dy = abs(y1 - y2);
-
-        adjacent = (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
-    end
+% Initial target is the start tile
+[targetX, targetY] = getCartesian(mPath{1});
 
 
 % Iterate over selected tiles
@@ -768,6 +800,7 @@ for i = 1:length(selectedTiles)
             if consecutiveErrors > 0
                 retouchCurrentTilePositionCorrect = true;
                 consecutiveErrors = 0; % Reset errors
+
             else
                 retouchCurrentTilePositionError = true;
             end
@@ -797,26 +830,52 @@ for i = 1:length(selectedTiles)
         % Perseverative errors
         if backTrackError
             errorTypes(i) = "perseverativeBackTrackError";
+            tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX) = tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX) + 1;
+            tileSpecificErrorCounts.backTrackErrors(7 - targetY, targetX) = tileSpecificErrorCounts.backTrackErrors(7 - targetY, targetX) + 1;
+            tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) = tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) + 1;
         elseif retouchCurrentTilePositionError
             errorTypes(i) = "perseverativeRetouchError";
+            tileSpecificErrorCounts.retouchErrors(7 - targetY, targetX)  = tileSpecificErrorCounts.retouchErrors(7 - targetY, targetX) + 1;
+            tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) = tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) + 1;
+
         elseif ruleAbidingError
             errorTypes(i) = "perseverativeRuleAbidingError";
+            tileSpecificErrorCounts.ruleAbidingErrors(7 - targetY, targetX) = tileSpecificErrorCounts.ruleAbidingErrors(7 - targetY, targetX)  + 1;
+            tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) = tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) + 1;
+
         else
             errorTypes(i) = "perseverativeRuleBreakingError";
+            tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX)  = tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX)  + 1;
+            tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) = tileSpecificErrorCounts.perseverativeErrors(7 - targetY, targetX) + 1;
         end
     else
         if retouchCurrentTilePositionCorrect
             errorTypes(i) = "retouchCorrect";
+            [targetX, targetY] = getCartesian(mPath{lastCorrectIndex + 1});
+
         elseif correctNextTileChoice
             errorTypes(i) = "correct";
+            [targetX, targetY] = getCartesian(mPath{min(lastCorrectIndex + 1, length(mPath))});
+
         elseif backTrackError
             errorTypes(i) = "backTrackError";
+            tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX) = tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX)  + 1;
+            tileSpecificErrorCounts.backTrackErrors(7 - targetY, targetX) = tileSpecificErrorCounts.backTrackErrors(7 - targetY, targetX) + 1;
+            [targetX, targetY] = getCartesian(mPath{lastCorrectIndex});
+
         elseif retouchCurrentTilePositionError
             errorTypes(i) = "retouchError";
+            tileSpecificErrorCounts.retouchErrors(7 - targetY, targetX) = tileSpecificErrorCounts.retouchErrors(7 - targetY, targetX)  + 1;
         elseif ruleAbidingError
             errorTypes(i) = "ruleAbidingError";
+            tileSpecificErrorCounts.ruleAbidingErrors(7 - targetY, targetX) = tileSpecificErrorCounts.ruleAbidingErrors(7 - targetY, targetX) + 1;
+            [targetX, targetY] = getCartesian(mPath{lastCorrectIndex});
+
         elseif ruleBreakingError
             errorTypes(i) = "ruleBreakingError";
+            tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX) = tileSpecificErrorCounts.ruleBreakingErrors(7 - targetY, targetX)  + 1;
+            [targetX, targetY] = getCartesian(mPath{lastCorrectIndex});
+
         end
     end
 
@@ -838,7 +897,7 @@ for i = 2:length(mPath)-1
     turns(i) = checkIfTurn(mPath{i-1}, mPath{i}, mPath{i+1});
 end
 end
-function [isTowards] = isMovingTowardsEnd(currentTile, nextTile, endTile)
+function isTowards = isMovingTowardsEnd(currentTile, nextTile, endTile)
 % Convert chess coordinates to Cartesian
 [currentX, currentY] = getCartesian(currentTile);
 [nextX, nextY] = getCartesian(nextTile);
@@ -878,53 +937,50 @@ yCoord = str2double(coord(2)); % Convert second character to double for y-coordi
 end
 
 function metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesInTrial, pathType, trialInBlock)
-    ignoreErrors = false;
-    tempErrorCounts = struct('ruleBreakingErrors', 0, ...
-        'ruleAbidingErrors', 0, ...
-        'backTrackErrors', 0, ...
-        'perseverativeErrors', 0, ...
-        'retouchErrors', 0);
-    
-    for iError = 1:length(errorTypesInTrial)
-        errorType = errorTypesInTrial{iError};
-        
-        % Reset error ignoring upon retouchCorrect
-        if strcmp(errorType, 'retouchCorrect')
-            ignoreErrors = false;
-            continue;
-        end
-        
-        % Skip counting errors until retouchCorrect is encountered
-        if ignoreErrors
-            continue;
-        end
-        
-        % Count initial error and specific types
-        if any(strcmp(errorType, {'ruleAbidingError', 'ruleBreakingError', 'backTrackError'}))
-            tempErrorCounts.([errorType 's']) = tempErrorCounts.([errorType 's']) + 1; % Note the 's' to match struct field names
-            ignoreErrors = true; % Start ignoring subsequent errors until retouchCorrect
-        elseif contains(errorType, 'perseverative')
-            tempErrorCounts.perseverativeErrors = tempErrorCounts.perseverativeErrors + 1;
-            ignoreErrors = true; % Similar treatment for perseverative errors
-        elseif strcmp(errorType, 'retouchError')
-            tempErrorCounts.retouchErrors = tempErrorCounts.retouchErrors + 1;
-            % Note: retouchError does not trigger ignoreErrors
-        end
+ignoreErrors = false;
+tempErrorCounts = struct('ruleBreakingErrors', 0, ...
+    'ruleAbidingErrors', 0, ...
+    'backTrackErrors', 0, ...
+    'perseverativeErrors', 0, ...
+    'retouchErrors', 0);
+
+for iError = 1:length(errorTypesInTrial)
+    errorType = errorTypesInTrial{iError};
+
+    % Reset error ignoring upon retouchCorrect
+    if strcmp(errorType, 'retouchCorrect')
+        ignoreErrors = false;
+        continue;
     end
 
-    % Now, append the processed error counts to metrics_mz using AppendSpatialErrors
-    metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, tempErrorCounts, pathType, trialInBlock);
+    % Skip counting errors until retouchCorrect is encountered
+    if ignoreErrors
+        continue;
+    end
+
+    % Count initial error and specific types
+    if any(strcmp(errorType, {'ruleAbidingError', 'ruleBreakingError', 'backTrackError'}))
+        tempErrorCounts.([errorType 's']) = tempErrorCounts.([errorType 's']) + 1; % Note the 's' to match struct field names
+        ignoreErrors = true; % Start ignoring subsequent errors until retouchCorrect
+    elseif contains(errorType, 'perseverative')
+        tempErrorCounts.perseverativeErrors = tempErrorCounts.perseverativeErrors + 1;
+        ignoreErrors = true; % Similar treatment for perseverative errors
+    elseif strcmp(errorType, 'retouchError')
+        tempErrorCounts.retouchErrors = tempErrorCounts.retouchErrors + 1;
+        % Note: retouchError does not trigger ignoreErrors
+    end
 end
-function metrics_mz = AppendSpatialErrors(metrics_mz, mazeType, errorCounts, pathType, trialInBlock)
-    fields = fieldnames(errorCounts);
-  
 
-    for i = 1:numel(fields)
-        fieldName = fields{i};
-        currentCount = errorCounts.(fieldName);
-            metrics_mz.(mazeType).(pathType).(fieldName){trialInBlock} = [metrics_mz.(mazeType).(pathType).(fieldName){trialInBlock}, currentCount];
-    
-    end
+% Now, append the processed error counts to metrics_mz using AppendSpatialErrors
+metrics_mz = AppendSubtypeErrors(metrics_mz, mazeType, tempErrorCounts, pathType, trialInBlock);
+end
+function metrics_mz = AppendSubtypeErrors(metrics_mz, mazeType, subTypeFields, subType, blockNum)
+fields = fieldnames(subTypeFields);
+for i = 1:numel(fields)
+    fieldName = fields{i};
+    currentCount = subTypeFields.(fieldName);
+    metrics_mz.(mazeType).(subType).(fieldName){blockNum} = [metrics_mz.(mazeType).(subType).(fieldName){blockNum}, currentCount];
+end
 end
 
 
@@ -976,7 +1032,7 @@ end
 % Customize the plot
 title([res(1).subjectName '- Average Normalized Errors Across Maze Condition']);
 xlabel('Maze Condition');
-ylabel('Average Normalized Errors');
+ylabel('Average Normalized Error Rates (Normalized by Path Length in Trial)');
 xlim([0.5, length(avgData) + 0.5]); % Adjust the x-axis limits to improve visibility
 set(gca, 'XTick', 1:length(avgData), 'XTickLabel', xLabels, 'XTickLabelRotation', 45); % Use custom x-axis labels
 legend('show'); % Show legend to distinguish between metrics
@@ -1002,7 +1058,7 @@ end
 
 % Specific dates to draw vertical lines
 % verticalLineDates = {'02/12', '02/19', '02/26', '03/04', '03/11', '03/18'};
-verticalLineDates = {'04/01'};
+verticalLineDates = {'04/01', '04/08'};
 
 % Define fields to analyze
 fields = {'normalizedTotalErrors', 'normalizedRuleAbidingErrors', 'normalizedRuleBreakingErrors', 'normalizedPerseverativeErrors'};
@@ -1043,13 +1099,14 @@ end
 % Customize the plot
 title([res(1).subjectName ' - Average Normalized Errors Across Session Date']);
 xlabel('Session Date');
-ylabel('Average Normalized Errors');
+ylabel('Average Normalized Error Rates (Normalized by Path Length in Trial)');
 xlim([0.5, numSessions + 0.5]); % Adjust the x-axis limits to improve visibility
 set(gca, 'XTick', 1:numSessions, 'XTickLabel', xLabels, 'XTickLabelRotation', 45); % Use custom x-axis labels for each session
 legend('show'); % Show legend to distinguish between metrics
 hold off; % No more plots on this figure
 
 end
+
 function plot_AcrossSessionAnalysis_SortedByWeekday(metrics_mz, res)
 % Prepare for plotting on the same figure
 figure;
@@ -1091,55 +1148,33 @@ end
 % Customize the plot
 title([res(1).subjectName '- Average Normalized Errors by Weekday']);
 xlabel('Weekday');
-ylabel('Average Normalized Errors');
+ylabel('Average Normalized Error Rates (Normalized by Path Length in Trial)');
 xlim([0.5, length(daysOfTheWeek) + 0.5]); % Adjust the x-axis limits to improve visibility
 set(gca, 'XTick', 1:length(daysOfTheWeek), 'XTickLabel', daysOfTheWeek, 'XTickLabelRotation', 45); % Use custom x-axis labels for each weekday
 legend('show'); % Show legend to distinguish between metrics
 hold off; % No more plots on this figure
 end
 
-
 function plot_AcrossSessionAnalysis_LearningCurve(metrics_mz, res, uniqueTrialCounts)
 % Prepare for plotting on the same figure
 figure;
 hold on; % Allows multiple plots on the same figure
+title('Learning Curve for Aggregate Error Analysis'); % Title for the plot
 
 % Define fields to analyze
-fields = {'normalizedTotalErrors', 'normalizedRuleAbidingErrors', 'normalizedRuleBreakingErrors', 'normalizedPerseverativeErrors'};
-% fields = {'normalizedRuleAbidingErrors'};
+fields = {'normalizedTotalErrors', 'normalizedRuleAbidingErrors', 'normalizedRuleBreakingErrors', 'normalizedPerseverativeErrors', 'normalizedMazeDurations'};
 
-% % Colors or markers for each field for distinction
-markers = {'o-', '+-', '*-', 'x-'};
-colors = {'blue', 'red', 'green', 'black'};
+% Colors or markers for each field for distinction
+markers = {'o-', '+-', '*-', 'x-', '--'};
+colors = {'blue', 'red', 'green', 'black', 'magenta'};
 
-% CODE BELOW IS FOR WITHOUT OUTLIERS REMOVED
-% for f = 1:length(fields)
-%     fieldName = fields{f};
-%
-%     % Initialize arrays to store the averages and SEMs for each trial count
-%     avgData = zeros(1, length(uniqueTrialCounts));
-%     semData = zeros(1, length(uniqueTrialCounts));  % SEM instead of standard deviation
-%
-%     % Calculate average and SEM for each trial count
-%     for iTrialInBlock = 1:length(uniqueTrialCounts)
-%         data = metrics_mz.Aggregate.(fieldName){iTrialInBlock}; % Assuming data is stored similarly
-%
-%         if ~isempty(data)
-%             n = length(data);  % Sample size
-%             avgData(iTrialInBlock) = mean(data);
-%             semData(iTrialInBlock) = std(data) / sqrt(n);  % Calculate SEM
-%         end
-%     end
-%
-%     % Plot the current metric with error bars using SEM
-%     errorbar(1:length(uniqueTrialCounts), avgData, semData, markers{f}, 'Color', colors{f}, 'DisplayName', strrep(fieldName, 'normalized', 'Normalized '));
-% end
+% Loop through each error field to plot
 for f = 1:length(fields)
     fieldName = fields{f};
 
     % Initialize arrays to store the averages and SEMs for each trial count
     avgData = zeros(1, length(uniqueTrialCounts));
-    semData = zeros(1, length(uniqueTrialCounts));  % SEM instead of standard deviation
+    semData = zeros(1, length(uniqueTrialCounts));
 
     % Calculate average and SEM for each trial count
     for iTrialInBlock = 1:length(uniqueTrialCounts)
@@ -1155,7 +1190,9 @@ for f = 1:length(fields)
 
             dataWithoutOutliers = data(data >= lowerBound & data <= upperBound);
 
-            disp(['data removed ' num2str(length(data) - length(dataWithoutOutliers))])
+            % Display removed data count
+            disp(['Data removed for ' fieldName ': ' num2str(length(data) - length(dataWithoutOutliers))]);
+
             % Proceed if there are any data points left after removing outliers
             if ~isempty(dataWithoutOutliers)
                 n = length(dataWithoutOutliers);  % Sample size
@@ -1169,68 +1206,135 @@ for f = 1:length(fields)
     errorbar(1:length(uniqueTrialCounts), avgData, semData, markers{f}, 'Color', colors{f}, 'DisplayName', strrep(fieldName, 'normalized', 'Normalized '));
 end
 
+% Configure x-axis to show only whole number ticks corresponding to trial counts
+xticks(1:length(uniqueTrialCounts)); % Set x-axis ticks to cover all trial counts explicitly
+
+% Add plot legends, labels, and grid
+title([res(1).subjectName '- Average Normalized Errors and Maze Durations by Trial in Block (Outliers Removed)']);
+legend show;
+xlim([0.5, length(uniqueTrialCounts) + 0.5]);
+xlabel('Trial Count In Block');
+ylabel('Average Normalized Error Rates and Maze Durations (Normalized by Path Length in Trial)');
+grid on;
+hold off;
 end
 
 function plot_AcrossSessionAnalysis_TurnVsStraightErrorRate(metrics_mz, res)
 % Define error types
 errorTypes = {'ruleBreakingErrors', 'ruleAbidingErrors', 'perseverativeErrors', 'retouchErrors', 'backTrackErrors'};
 
-% Preallocate arrays for means and SEMs
-means_straight = zeros(1, length(errorTypes));
-sems_straight = zeros(1, length(errorTypes));
-means_turn = zeros(1, length(errorTypes));
-sems_turn = zeros(1, length(errorTypes));
+% Initialize arrays to store averages and SEMs for each error type
+avgTurnData = zeros(1, length(errorTypes));
+semTurnData = zeros(1, length(errorTypes));
+avgStraightData = zeros(1, length(errorTypes));
+semStraightData = zeros(1, length(errorTypes));
 
-% Calculate means and SEMs for each error type
-for i = 1:length(errorTypes)
-    % Straight
-    data_straight = metrics_mz.Aggregate.straight.(errorTypes{i});
-    means_straight(i) = mean(data_straight);
-    sems_straight(i) = std(data_straight) / sqrt(length(data_straight));
+% Loop through each error type
+for f = 1:length(errorTypes)
+    fieldName = errorTypes{f};
 
-    % Turn
-    data_turn = metrics_mz.Aggregate.turn.(errorTypes{i});
-    means_turn(i) = mean(data_turn);
-    sems_turn(i) = std(data_turn) / sqrt(length(data_turn));
+    % Collect data for turns and straights
+    allTurnData = [metrics_mz.Aggregate.turn.(fieldName){:}];
+    allStraightData = [metrics_mz.Aggregate.straight.(fieldName){:}];
+
+    % Calculate average and SEM for turns and straights
+    avgTurnData(f) = mean(allTurnData);
+    semTurnData(f) = std(allTurnData) / sqrt(length(allTurnData));
+    avgStraightData(f) = mean(allStraightData);
+    semStraightData(f) = std(allStraightData) / sqrt(length(allStraightData));
 end
 
-% Plotting
+% Create a bar graph with error bars
 figure;
-hold on;
+hold on;  % Ensure no previous plots are interfering
 
-% X-axis positions for each error type group
-x_straight = 1:length(errorTypes);
-x_turn = x_straight + 0.2; % Offset turn for clarity
+% Bar graph with grouped bars
+barData = [avgTurnData; avgStraightData]';
+hb = bar(barData, 'grouped');
 
-% Plot straight
-errorbar(x_straight, means_straight, sems_straight, 's', 'MarkerSize', 10, 'MarkerEdgeColor', 'red', 'MarkerFaceColor', 'red', 'Color', 'red');
+% Add error bars
+% Calculate the positions for error bars for each group
+for i = 1:length(hb)
+    x = hb(i).XEndPoints;  % Get the end points of each set of bars
+    if i == 1
+        errorbar(x, barData(:, i), semTurnData, 'k', 'linestyle', 'none', 'CapSize', 10);
+    else
+        errorbar(x, barData(:, i), semStraightData, 'k', 'linestyle', 'none', 'CapSize', 10);
+    end
+end
 
-% Plot turn
-errorbar(x_turn, means_turn, sems_turn, 's', 'MarkerSize', 10, 'MarkerEdgeColor', 'blue', 'MarkerFaceColor', 'blue', 'Color', 'blue');
-
-% Improve the plot
-legend({'Straight', 'Turn'}, 'Location', 'Best');
-set(gca, 'XTick', (x_straight + x_turn)/2, 'XTickLabel', errorTypes, 'XTickLabelRotation', 30);
-ylabel('Mean Error Count Per Tile');
+% Set labels and title for the plot
+xticks(1:length(errorTypes));
+xticklabels(errorTypes);
 xlabel('Error Type');
-title([res(1).subjectName ' - Average Number of Errors for Straight vs. Turn Tiles']);
-grid on;
-
-% Adjust x-axis limits for margin
-xlim([0.5, length(errorTypes) + 0.7]);
-
+ylabel('Average Error Rate');
+title([res(1).subjectName ' - Average Error Rate (Turn vs. Straight)']);
+legend({'Turn', 'Straight'}, 'Location', 'best');
 hold off;
+end
 
+function plot_AcrossSessionAnalysis_TowardsVsAway(metrics_mz, res)
+% Define error types
+errorTypes = {'ruleBreakingErrors', 'ruleAbidingErrors', 'perseverativeErrors', 'retouchErrors', 'backTrackErrors'};
+
+% Initialize arrays to store averages and SEMs for each error type
+avgTowardsData = zeros(1, length(errorTypes));
+semTowardsData = zeros(1, length(errorTypes));
+avgAwayData = zeros(1, length(errorTypes));
+semAwayData = zeros(1, length(errorTypes));
+
+% Loop through each error type
+for f = 1:length(errorTypes)
+    fieldName = errorTypes{f};
+
+    % Collect data for towards and away
+    allTowardsData = [metrics_mz.Aggregate.towards.(fieldName){:}];
+    allAwayData = [metrics_mz.Aggregate.away.(fieldName){:}];
+
+    % Calculate average and SEM for towards and away
+    avgTowardsData(f) = mean(allTowardsData);
+    semTowardsData(f) = std(allTowardsData) / sqrt(length(allTowardsData));
+    avgAwayData(f) = mean(allAwayData);
+    semAwayData(f) = std(allAwayData) / sqrt(length(allAwayData));
+end
+
+% Create a bar graph with error bars
+figure;
+hold on;  % Ensure no previous plots are interfering
+
+% Bar graph with grouped bars
+barData = [avgTowardsData; avgAwayData]';
+hb = bar(barData, 'grouped');
+
+% Add error bars
+% Calculate the positions for error bars for each group
+for i = 1:length(hb)
+    x = hb(i).XEndPoints;  % Get the end points of each set of bars
+    if i == 1
+        errorbar(x, barData(:, i), semTowardsData, 'k', 'linestyle', 'none', 'CapSize', 10);
+    else
+        errorbar(x, barData(:, i), semAwayData, 'k', 'linestyle', 'none', 'CapSize', 10);
+    end
+end
+
+% Set labels and title for the plot
+xticks(1:length(errorTypes));
+xticklabels(errorTypes);
+xlabel('Error Type');
+ylabel('Average Error Rate');
+title([res(1).subjectName ' - Average Error Rate (Towards vs. Away)']);
+legend({'Towards', 'Away'}, 'Location', 'best');
+hold off;
 end
 
 function plot_AcrossSessionAnalysis_EarlyVsLate(metrics_mz, res)
 % Define mazes and fields to analyze
-mazes = {'Maze1', 'Maze2', 'Maze1Repeat'};
+mazes = {'Maze1', 'Maze1Repeat', 'Maze2'};
 fields = {'normalizedTotalErrors', 'normalizedRuleAbidingErrors', 'normalizedRuleBreakingErrors', 'normalizedPerseverativeErrors'};
 
 % Colors for Early, Repeat, Late
-colors = {'red', 'blue', 'green'};
-stageLabels = {'Early', 'Late', 'Repeat'}; % This will be used for the legend
+colors = {[0.8500, 0.3250, 0.0980], [0, 0.4470, 0.7410], [0.4660, 0.6740, 0.1880]}; % MATLAB default color order
+stageLabels = {'Early', 'Repeat', 'Late', }; % This will be used for the legend
 
 figure;
 hold on;
@@ -1249,18 +1353,18 @@ for iField = 1:nGroups
 
         % Calculate mean and SEM if stageData is not empty
         if ~isempty(data)
-                mazeAverages(iMaze, iField) = mean(data);
-                mazeSEMs(iMaze, iField) = std(data) / sqrt(length(data));
+            mazeAverages(iMaze, iField) = mean(data);
+            mazeSEMs(iMaze, iField) = std(data) / sqrt(length(data));
         end
 
-       % Adjust xPosition calculation for better spacing between bars within each group
+        % Adjust xPosition calculation for better spacing between bars within each group
         xPosition = (iField - 1) * interGroupSpacing + (iMaze - 1) * (groupWidth / nBars) + 1;
 
         % Plotting the bar
         bar(xPosition, mazeAverages(iMaze, iField), groupWidth / nBars, 'FaceColor', colors{iMaze});
 
         % Overlaying error bars
-        errorbar(xPosition, mazeAverages(iMaze, iField), mazeSEMs(iMaze, iField), 'k', 'linestyle', 'none', 'LineWidth', 0.8);
+        errorbar(xPosition, mazeAverages(iMaze, iField), mazeSEMs(iMaze, iField), 'k', 'linestyle', 'none');
     end
 end
 
@@ -1276,9 +1380,54 @@ for i = 1:length(colors)
 end
 legend(b, stageLabels, 'Location', 'Best');
 title([res(1).subjectName ' - Average Normalized Errors For Early, Late, and Repeat Mazes']);
-ylabel('Average Normalized Errors');
+ylabel('Average Normalized Error Rates (Normalized by Path Length in Trial)');
+
 hold off;
 end
+function plot_AcrossSessionAnalysis_ReactionTimes(metrics_mz, res)
+    % Define categories of reaction times to analyze
+    categories = {'correctToCorrect', 'correctToError', 'errorToRetouch', ...
+                  'retouchToCorrect', 'retouchToError', 'errorToError'};
+
+    % Initialize arrays to store averages and SEMs for each category
+    avgData = zeros(1, length(categories));
+    semData = zeros(1, length(categories));
+
+    % Define a color matrix with unique colors for each category
+    colors = lines(length(categories)); % MATLAB's 'lines' colormap provides distinct colors
+
+    % Loop through each category to collect and calculate data for Aggregate only
+    for j = 1:length(categories)
+        % Collect all reaction times for the current category under Aggregate
+        reactionTimes = [metrics_mz.Aggregate.(categories{j}){:}];
+        
+        % Calculate average and SEM if there are any data points
+        if ~isempty(reactionTimes)
+            avgData(j) = mean(reactionTimes);
+            semData(j) = std(reactionTimes) / sqrt(length(reactionTimes));
+        end
+    end
+
+    % Create a bar graph with error bars
+    figure;
+    hold on;  % Ensure no previous plots are interfering
+
+    % Bar graph for aggregate data with different colors for each bar
+    for j = 1:length(categories)
+        hb = bar(j, avgData(j), 'FaceColor', colors(j, :)); % Assign color to each bar
+    end
+
+    ylabel('Average Reaction Time (s)');
+    title([res(1).subjectName ' - Aggregate Average Reaction Times by Selection Classifications']);
+    set(gca, 'XTick', 1:length(categories), 'XTickLabel', categories);
+    xtickangle(30);  % Adjust tick angle for better visibility if needed
+
+    % Add error bars correctly positioned over each bar
+    errorbar(1:length(categories), avgData, semData, 'k', 'linestyle', 'none', 'CapSize', 10);
+
+    hold off;
+end
+
 
 
 function currentSessionData = AppendCurrentSessionData(currentTrialData, currentSessionData, blockDef)
@@ -1308,7 +1457,10 @@ for jj = 1:length(currentTrialData)
     currentSessionData.sliderBarFilled(iT) = strcmp(currentTrialData(jj).SliderBarFilled,'True');
     currentSessionData.totalErrors(iT) = currentTrialData(jj).TotalErrors;
     currentSessionData.selectedTiles{iT} = strsplit(currentTrialData(jj).SelectedTiles, ',');
-    currentSessionData.errorTypes{iT} = determineSelectionError( currentSessionData.selectedTiles{iT}, mazeStruct.mPath);
+    [currentSessionData.errorTypes{iT}, currentSessionData.tileSpecificErrorCounts{iT}]  = determineSelectionError( currentSessionData.selectedTiles{iT}, mazeStruct.mPath);
+    if isfield(currentTrialData(jj), 'ReactionTimePerSelectedTiles')
+        currentSessionData.reactionTimes{iT} = strsplit(currentTrialData(jj).ReactionTimePerSelectedTiles, ',');
+    end
     currentSessionData.correctTouches(iT) = currentTrialData(jj).CorrectTouches;
     currentSessionData.retouchCorrect(iT) = currentTrialData(jj).RetouchCorrect;
     currentSessionData.retouchErroneous(iT) = currentTrialData(jj).RetouchErroneous;
@@ -1322,35 +1474,93 @@ for jj = 1:length(currentTrialData)
 
 end
 end
-function metrics_mz = ProcessMazeTurnData(metrics_mz, currentMazedata, mazeType)
-    for iTrial = 1:length(currentMazedata.trialInBlock)
-        mPath = currentMazedata.mazePath{iTrial};
-        turns = find(getTurnsAlongPath(mPath)) + 1;
-        errorTypesInTrial = currentMazedata.errorTypes{iTrial};
-        pathProgress = find(strcmp(errorTypesInTrial, 'correct'));
+function metrics_mz = ProcessSpatialMazeData(metrics_mz, currentMazedata, mazeType, do_AcrossSessionAnalysis_TurnVsStraightErrorRate, do_AcrossSessionAnalysis_TowardsVsAwayEndTile)
+for iTrial = 1:length(currentMazedata.trialInBlock)
+    mPath = currentMazedata.mazePath{iTrial};
+    turns = find(getTurnsAlongPath(mPath)) + 1;
+    errorTypesInTrial = currentMazedata.errorTypes{iTrial};
+    pathProgress = find(strcmp(errorTypesInTrial, 'correct'));
+    pathType = '';
+    directionType = '';
 
-        if length(pathProgress) < 3
-            continue;  % Need at least two 'correct' to define a path segment 
+    if length(pathProgress) < 2
+        continue;  % Need at least 1 'correct' to define towards/away and need atleast 2 'correct' to define turn/straight
+    end
+
+    startIndex = pathProgress(1) + 1;  % Initial error checking starts after the first correct
+    for iTile = 2:length(pathProgress) % iTile represents the next tile along the path
+        if iTile > length(mPath) || pathProgress(iTile) > length(errorTypesInTrial)
+            break;  % Avoid indexing beyond the bounds
         end
 
-        startIndex = pathProgress(2) + 1;  % Initial error checking starts after the first correct
-        for iTile = 3:length(pathProgress)
-            if iTile > length(mPath) || pathProgress(iTile) > length(errorTypesInTrial)
-                break;  % Avoid indexing beyond the bounds
-            end
+        endIndex = pathProgress(iTile) - 1;  % Errors to be considered end before the next 'correct'
+        errorTypesDuringSelection = errorTypesInTrial(startIndex:endIndex);
 
-            endIndex = pathProgress(iTile) - 1;  % Errors to be considered end before the next 'correct'
-            errorTypesDuringSelection = errorTypesInTrial(startIndex:endIndex);
-            if any(turns == iTile) 
+        currentTilePos = mPath{iTile - 1};
+        targetTilePos = mPath{iTile};
+        endTilePos = mPath{end};
+        if iTile > 2
+            if any(turns == iTile)
                 pathType = 'turn';
             else
-                pathType = 'straight'; 
+                pathType = 'straight';
             end
-            
-            trialInBlock = currentMazedata.trialInBlock(iTrial);
-            metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesDuringSelection, pathType, trialInBlock);
-            startIndex = pathProgress(iTile) + 1;  % Update startIndex for the next set of errors
+        end
+
+        if(isMovingTowardsEnd(currentTilePos, targetTilePos, endTilePos))
+            directionType = 'towards';
+        else
+            directionType = 'away';
+        end
+
+        blockNum = currentMazedata.blockNum(iTrial);
+        startIndex = pathProgress(iTile) + 1;  % Update startIndex for the next set of errors
+
+        if(~strcmp(pathType, '') && (do_AcrossSessionAnalysis_TurnVsStraightErrorRate == 1))
+            metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesDuringSelection, pathType, blockNum);
+            pathType = '';
+        end
+        if(~strcmp(directionType, '') && (do_AcrossSessionAnalysis_TowardsVsAwayEndTile == 1))
+            metrics_mz = ProcessAndAppendPathErrors(metrics_mz, mazeType, errorTypesDuringSelection, directionType, blockNum);
+            directionType = '';
+        end
+
+    end
+end
+end
+
+function metrics_mz = ProcessReactionTimeData(metrics_mz, currentMazeData, mazeType)
+
+for iTrial = 1 : length(currentMazeData.trialInBlock)
+    errorTypes = currentMazeData.errorTypes{iTrial};
+    reactionTimes = currentMazeData.reactionTimes{iTrial};
+
+    
+    % Collect reaction times based on error transitions
+    for iError = 2:length(errorTypes)-1
+        currentType = errorTypes{iError -1};
+        nextType = errorTypes{iError};
+currentReactionTime = str2double(reactionTimes{iError}); % Convert to double if necessary
+
+            % Check for NaN in case the conversion fails
+            if isnan(currentReactionTime)
+                continue; % Skip this iteration if the reaction time isn't a valid number
+            end
+        if strcmp(currentType, 'correct') && strcmp(nextType, 'correct')
+            metrics_mz.(mazeType).correctToCorrect = [metrics_mz.(mazeType).correctToCorrect, currentReactionTime];
+        elseif strcmp(currentType, 'correct') && contains(lower(nextType), 'error')
+            metrics_mz.(mazeType).correctToError = [metrics_mz.(mazeType).correctToError, currentReactionTime];
+        elseif contains(lower(currentType), 'error') && contains(lower(nextType), 'error')
+            metrics_mz.(mazeType).errorToError = [metrics_mz.(mazeType).correctToError, currentReactionTime];
+        elseif contains(lower(currentType), 'error') && strcmp(nextType, 'retouchCorrect')
+            metrics_mz.(mazeType).errorToRetouch = [metrics_mz.(mazeType).errorToRetouch, currentReactionTime];
+        elseif strcmp(currentType, 'retouchCorrect') && strcmp(nextType, 'correct')
+            metrics_mz.(mazeType).retouchToCorrect = [metrics_mz.(mazeType).retouchToCorrect, currentReactionTime];
+        elseif strcmp(currentType, 'retouchCorrect') && contains(lower(nextType), 'error')
+            metrics_mz.(mazeType).retouchToError = [metrics_mz.(mazeType).retouchToError, currentReactionTime];
         end
     end
+end
+
 end
 
