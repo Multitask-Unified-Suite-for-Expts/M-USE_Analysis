@@ -16,7 +16,7 @@ function figureData = GenerateTimingFigure(serialRecvData)
     validSequenceIndices = GetValidSequences(unexpectedFrameSequenceIdxs, unexpectedSequenceWidth, unexpectedSequenceBuffer);
 
     %choose one sequence to plot
-    plotIndex = validSequenceIndices(1);
+    plotIndex = unexpectedFrameSequenceIdxs(validSequenceIndices(1));
 
     plotIs = (plotIndex- unexpectedSequenceBuffer : plotIndex + unexpectedSequenceBuffer)';
     figureDetectedFrames = DetectedFramesR(plotIs, :);
@@ -34,6 +34,8 @@ function figureData = GenerateTimingFigure(serialRecvData)
     % Plot the analog data
     hold on
     plot(figureAnalogData.SynchBoxTime, figureAnalogData.LightR / 255);
+    plot([44.3848000000000, 44.3848000000000], ylim, 'r--', 'LineWidth', 1.5, 'DisplayName', 'Temporal Imprecision');
+
     scatter(figureFlipDetails.SynchBoxTime, figureFlipDetails.LightR / 255);
     
 % Draw vertical gray lines at CorrectedTimes in filteredFlipDetails
@@ -81,15 +83,15 @@ function [filteredAnalogData, filteredFlipDetails] = convert_frame_details_to_an
     
 end
 
-function filteredDiscretizedData = frame_details_to_discretized_data(frameDetails, discretizedData)
-    startIndex = frameDetails{1, 4};
-    endIndex = frameDetails{height(frameDetails), 4};
-    filteredDiscretizedData = discretizedData(startIndex:endIndex, :);
-end
-
 function filteredFlipDetails = discretized_data_to_flip_details(discretizedData, flipDetails)
     startFlipDetailsIdx = discretizedData.FlipIndex(1);
     endFlipDetailsIdx = discretizedData.FlipIndex(height(discretizedData));
     
     filteredFlipDetails = flipDetails(startFlipDetailsIdx:endFlipDetailsIdx, :);
 end
+
+% function filteredDiscretizedData = frame_details_to_discretized_data(frameDetails, discretizedData)
+%     startIndex = frameDetails{1, 4};
+%     endIndex = frameDetails{height(frameDetails), 4};
+%     filteredDiscretizedData = discretizedData(startIndex:endIndex, :);
+% end
